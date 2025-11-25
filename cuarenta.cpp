@@ -2,6 +2,9 @@
 #include <random>
 #include <algorithm>
 #include <optional>
+#include <utility>
+#include <cassert>
+#include <limits>
 
 namespace Cuarenta {
 
@@ -18,7 +21,7 @@ Deck make_cuarenta_deck() {
 
     for (Rank r : ranks) {
         for (int i=0; i<4; i++) {
-            d.cards.push_back(Card{r});
+            d.cards.push_back(r);
         }
     }
 
@@ -26,6 +29,10 @@ Deck make_cuarenta_deck() {
     std::mt19937 g(rd());
     std::shuffle(d.cards.begin(), d.cards.end(), g);
     return d;
+}
+
+bool is_valid_move(const Move& move, const Table& table) {
+    return true;
 }
 
 Hand generate_hand(Deck& d) {
@@ -39,76 +46,71 @@ Hand generate_hand(Deck& d) {
     return h;
 }
 
-bool remove_rank_if_present(std::vector<Card>& cards, const Card& card) {
-    size_t prev_size = cards.size();
-    cards.erase(std::remove(cards.begin(), cards.end(), card), cards.end());
-    return cards.size() < prev_size;
+void remove_ranks(RankMask& cards, const RankMask to_remove) {
+    cards = cards & ~(cards & to_remove);
 }
 
-bool contains_multiple(const std::vector<Card>& cards_A, const std::vector<Card>& cards_B) {
-    for (Card card_B : cards_B) {
-        if (std::find(cards_A.begin(), cards_A.end(), card_B) == cards_A.end()) {
-            return false;
-        };
-    }
-    return true;
+void add_ranks(RankMask& cards, const RankMask to_add) {
+    cards = cards | to_add;
 }
 
-void sequence_waterfall(std::vector<Card>& cards, const Card& start_card) {
-    Card current_card = start_card;
-    while (current_card.rank_ != Rank::King) {
-        current_card.rank_++;
-        if (!remove_rank_if_present(cards, current_card)) { return; } 
+void sequence_waterfall(RankMask& cards, const Rank start_card) {
+    Rank current_card = start_card;
+    while (current_card != Rank::King) {
+        current_card++;
+        if (contains_ranks(cards, to_mask(current_card))) { 
+            remove_ranks(cards, to_mask(current_card));
+        }
+        else { return; }
     }
 }
 
-int play_card(const Card& card, 
-               Table& table, 
-               int capture_offset) {
-    
-    bool capture_made { false };
+
+int play_card(const Move& move, Hand& hand, Table& table) {
+
+    assert(is_valid_move(move, table) && "play_card precondition violated");
+
+    int maximum_played_bit { NUM_RANK_BITS - std::countl_zero(to_u16(move.table_targets)) };
+    Rank played_card { int_to_rank(maximum_played_bit) };
+
     int points_scored { 0 };
-    
-    if (capture_offset == 0) {
-        if (remove_rank_if_present(table.cards, card)) { 
 
-            capture_made = true;
+    // Move is a simple capture or add-to-table, non-addition
+    if (std::has_single_bit(to_u16(move.table_targets))) {
+
+        if (contains_ranks(table.cards, move.table_targets)) {
+            
+            remove_ranks(table.cards, move.table_targets);
 
             // caida, +2pts
-            if (card.rank_ == table.last_played_card.rank_) { 
+            if (played_card == table.last_played_card) { 
                 points_scored += 2;
+                table.last_played_card = Rank::Invalid; //NEED TO DO FOR ADDITION
+
             }
-            sequence_waterfall(table.cards, card);
+            sequence_waterfall(table.cards, played_card);
+        }
+
+        else {
+            table.last_played_card = played_card;
+            add_ranks(table.cards, move.table_targets);
         }
     }
 
-    if (capture_offset != 0) {
-
-        // Result = a1 + a2, 
-        // Diff.  = a1 - a2
-        // a1 = (R+D)/2
-        // a2 = (R-D)/2        
-        Card sum_1 {int_to_rank((rank_to_int(card.rank_) + capture_offset) / 2)};
-        Card sum_2 {int_to_rank((rank_to_int(card.rank_) - capture_offset) / 2)};
-
-        std::vector<Card> to_check { { sum_1, sum_2 } };
-
-        if (contains_multiple(table.cards, to_check)) {
-            capture_made = true;
-            remove_rank_if_present(table.cards, sum_1);
-            remove_rank_if_present(table.cards, sum_2);
-            sequence_waterfall(table.cards, card);
+    // Move is an addition
+    else {
+        if (contains_ranks(table.cards, move.table_targets)) {
+            remove_ranks(table.cards, move.table_targets);
+            sequence_waterfall(table.cards, played_card);
+        }
+        else { 
+            throw std::invalid_argument("Invalid RankMask used, cards are not on the table.\n"); 
         }
     }
 
     // limpia, +2 points
-    if (table.cards.empty()) {
+    if (to_u16(table.cards) == 0) {
         points_scored += 2;
-    }
-
-    if (!capture_made) {
-        table.cards.push_back(card);
-        table.last_played_card = card;
     }
 
     return points_scored;

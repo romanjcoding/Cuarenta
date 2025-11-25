@@ -3,8 +3,68 @@
 #include <vector>
 #include <string>
 #include <stdexcept>
+#include <utility>
+#include <bit>
 
 namespace Cuarenta {
+
+enum class RankMask : uint16_t {}; // may hold multiple bits
+enum class Rank     : uint16_t { 
+    Ace=1,
+    Two=2, Three=4, Four=8, Five=16, Six=32, Seven=64, 
+    Jack=128, Queen=256, King=512,
+    Invalid = 0,
+};
+
+constexpr int MAX_MOVES_PER_BOARD {16};
+constexpr int NUM_RANK_BITS {std::numeric_limits<std::underlying_type_t<RankMask>>::digits};
+
+constexpr uint16_t to_u16(Rank r)      { return static_cast<uint16_t>(r); }
+constexpr uint16_t to_u16(RankMask m)  { return static_cast<uint16_t>(m); }
+
+constexpr RankMask to_mask(Rank r)     { return static_cast<RankMask>(r); }
+constexpr RankMask to_mask(uint16_t t) { return static_cast<RankMask>(t); }
+
+constexpr uint16_t ALL_RANK_BITS {
+    to_u16(Rank::Ace)   | to_u16(Rank::Two)   | to_u16(Rank::Three) |
+    to_u16(Rank::Four)  | to_u16(Rank::Five)  | to_u16(Rank::Six)   |
+    to_u16(Rank::Seven) | to_u16(Rank::Jack)  | to_u16(Rank::Queen) |
+    to_u16(Rank::King)};
+
+constexpr bool is_valid_rank(Rank r) {
+    uint16_t m = to_u16(r);
+    return (m == 0) ||
+           (std::has_single_bit(m) && (m & ~ALL_RANK_BITS) == 0);
+}
+
+constexpr Rank to_rank(uint16_t r) {
+    Rank rank { static_cast<Rank>(r) };
+    if (is_valid_rank(rank)) { return rank; }
+    else { 
+        throw std::invalid_argument("invalid (non-singular bit pattern) casted to Rank.\n"); 
+    }
+}
+
+constexpr Rank to_rank(RankMask r) {
+    Rank rank { static_cast<Rank>(r) };
+    if (is_valid_rank(rank)) { return rank; }
+    else {
+        throw std::invalid_argument("invalid (non-singular bit pattern) casted to Rank.\n");
+    }
+}
+
+
+constexpr RankMask operator &(const RankMask& rank_a, const RankMask& rank_b) { 
+    return static_cast<RankMask>(to_u16(rank_a) & to_u16(rank_b));
+}
+
+constexpr RankMask operator |(const RankMask& rank_a, const RankMask& rank_b) { 
+    return static_cast<RankMask>(to_u16(rank_a) | to_u16(rank_b));
+}
+
+constexpr RankMask operator ~(const RankMask& rank) { 
+    return static_cast<RankMask>(~to_u16(rank));
+}
 
 /* BOARD: A234567JQK
     10 possible non-additions (5 per hand.)
@@ -17,14 +77,6 @@ namespace Cuarenta {
             7: A+6, 2+5, 3+4, A+2+4 -> 4
             Maximized by holding 76543 = 4+3+2+1+1+5 = 16
 */
-constexpr int MAX_MOVES_PER_BOARD {16};
-
-enum class Rank {
-    Ace,
-    Two, Three, Four, Five, Six, Seven,
-    Jack, Queen, King,
-    Num_Ranks
-};
 
 struct Card {
     Rank rank_;
@@ -32,12 +84,12 @@ struct Card {
 };
 
 struct Deck {
-    std::vector<Card> cards;
+    std::vector<Rank> cards;
 };
 
 struct Move {
-    Card card;
-    int capture_offset{0};
+    // Move includes played-card and all captured cards
+    RankMask table_targets{0};
 };
 
 constexpr std::string rank_to_str (Rank rank) {
@@ -70,45 +122,43 @@ constexpr int rank_to_int (Rank rank) {
     }
 }
 
-constexpr Rank int_to_rank (int val) {
-    switch (val) {
-        case 1: return Rank::Ace;
-        case 2: return Rank::Two;
-        case 3: return Rank::Three;
-        case 4: return Rank::Four;
-        case 5: return Rank::Five;
-        case 6: return Rank::Six;
-        case 7: return Rank::Seven;
-        default: break;
-    }
-    throw std::out_of_range("Bad input, can only conver 2,3,4,5,6,7 into rank");
+constexpr Rank int_to_rank(int val) {
+    if (val == 0) return Rank::Invalid;
+    return to_rank(static_cast<uint16_t>(1 << (val - 1)));
 }
 
-inline Rank& operator++(Rank& rank, int) {
+constexpr Rank& operator++(Rank& rank, int) {
     switch(rank) {
-        case Rank::Ace :   return rank = Rank::Two;
-        case Rank::Two :   return rank = Rank::Three;
+        case Rank::Ace   : return rank = Rank::Two;
+        case Rank::Two   : return rank = Rank::Three;
         case Rank::Three : return rank = Rank::Four;
-        case Rank::Four :  return rank = Rank::Five;
-        case Rank::Five :  return rank = Rank::Six;
-        case Rank::Six :   return rank = Rank::Seven;
+        case Rank::Four  : return rank = Rank::Five;
+        case Rank::Five  : return rank = Rank::Six;
+        case Rank::Six   : return rank = Rank::Seven;
         case Rank::Seven : return rank = Rank::Jack;
-        case Rank::Jack :  return rank = Rank::Queen;
+        case Rank::Jack  : return rank = Rank::Queen;
         case Rank::Queen : return rank = Rank::King;
-        case Rank::King:
-            throw std::out_of_range("Cannot increment Rank::King");
-        case Rank::Num_Ranks:
-            throw std::out_of_range("Cannot increment Rank::Num_Ranks");
+        case Rank::King  : return rank = Rank::Invalid;
+        case Rank::Invalid:
+            throw std::out_of_range("Cannot increment Rank::Invalid");
     }
+}
+
+constexpr bool operator<(Rank a, Rank b) {
+    return rank_to_int(a) < rank_to_int(b);
+}
+
+bool inline contains_ranks(RankMask cards, RankMask ranks) {
+    return (to_u16(cards) & to_u16(ranks));
 }
 
 struct Hand {
 
-   std::vector<Card> cards;
+   std::vector<Rank> cards;
 
    void print_hand() { 
-        for (const Card& card : cards) {
-            std::cout << rank_to_str(card.rank_);
+        for (const Rank& rank : cards) {
+            std::cout << rank_to_str(rank);
         }
         std::cout << '\n';
     }
@@ -116,14 +166,15 @@ struct Hand {
 
 struct Table {
 
-    std::vector<Card> cards;
-    Card last_played_card{};
+    RankMask cards;
+    Rank last_played_card{ Rank::Invalid };
 
-    Table() { cards.reserve(8); }
     void print_table() {
         std::cout << "TABLE: ";
-        for (Card card : cards) {
-            std::cout << rank_to_str(card.rank_);
+        for (Rank rank = Rank::Ace; rank != Rank::Invalid; rank++) {
+            if (contains_ranks(cards, to_mask(rank))) {
+                std::cout << rank_to_str(rank);
+            }
         }
         std::cout << '\n';
     }
@@ -131,10 +182,12 @@ struct Table {
 
 Deck make_cuarenta_deck();
 Hand generate_hand(Deck& d);
-bool check_and_remove(std::vector<Card>& cards, const Card& card);
-int play_card(const Card& c, Table& t, int capture_offset = 0);
-bool remove_rank_if_present(std::vector<Card>& cards, const Card& card);
-bool contains_multiple(const std::vector<Card>& cards_A, const std::vector<Card>& cards_B);
+
+bool is_valid_move(const Move& move, const Table& table);
+int play_card(const Move& move, Hand& hand, Table& table);
+
+void remove_ranks(RankMask& cards, const RankMask to_remove);
+void sequence_waterfall(RankMask cards, const Card& start_card);
 
 struct Game1v1 {
     Deck deck { make_cuarenta_deck() };
