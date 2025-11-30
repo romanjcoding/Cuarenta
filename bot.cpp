@@ -14,7 +14,8 @@ int minimax(Cuarenta::Hand& hand_player,
             Cuarenta::Hand& hand_opponent, 
             Cuarenta::Table& table,
             int depth,
-            int score) {
+            int score,
+            bool color) {
 
     // if (depth == 0) { return heuristic_value(table); }
     if (depth == 0) { return score; }
@@ -25,9 +26,13 @@ int minimax(Cuarenta::Hand& hand_player,
     int value { std::numeric_limits<int>::min() };
 
     for (Cuarenta::Move move : Cuarenta::generate_all_moves(table, hand_player)) {
-        value = std::max(
-            value, -score + minimax(hand_opponent, hand_player, table, depth - 1, score + play_card(move, hand_player, table)));
+        std::bitset<16> x{Cuarenta::to_u16(move.table_targets)};
+        std::cout << x << '\n';
+        value = std::max(value, play_card(move, hand_player, table));
     }
-       return value;
-    }
+    return value;
+}
+
+
+
 }
