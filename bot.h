@@ -1,17 +1,13 @@
 #pragma once
 #include "cuarenta.h"
+#include "game_state.h"
 #include <vector>
 
 namespace Bot {
 
-int heuristic_value(Cuarenta::Table& table);
+constexpr int heuristic_value(Cuarenta::Game_State& game_state);
 void monte_carlo_generation();
 
-int minimax(Cuarenta::Hand& hand_player, 
-            Cuarenta::Hand& hand_opponent, 
-            Cuarenta::Table& table,
-            int depth,
-            int score,
-            bool color);
+int minimax(Cuarenta::Game_State&, const int depth);
 
 }
