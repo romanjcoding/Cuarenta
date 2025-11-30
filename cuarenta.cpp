@@ -24,7 +24,6 @@ Deck make_cuarenta_deck() {
             d.cards.push_back(r);
         }
     }
-
     std::random_device rd;
     std::mt19937 g(rd());
     std::shuffle(d.cards.begin(), d.cards.end(), g);
@@ -50,6 +49,11 @@ void remove_ranks(RankMask& cards, const RankMask to_remove) {
     cards = cards & ~(cards & to_remove);
 }
 
+void remove_card_from_hand(Hand& hand, const Rank& card) {
+    const auto ret { std::ranges::remove(hand.cards, card) };
+    hand.cards.erase(ret.begin(), ret.end());
+}
+
 void add_ranks(RankMask& cards, const RankMask to_add) {
     cards = cards | to_add;
 }
@@ -65,27 +69,72 @@ void sequence_waterfall(RankMask& cards, const Rank start_card) {
     }
 }
 
+// Game_State play_card(const Game_State& game_state, const Move& move) {
+
+//     int largest_bit  { NUM_RANK_BITS - std::countl_zero(to_u16(move.table_targets)) };
+//     Rank played_card { int_to_rank(largest_bit) };
+
+//     int points_scored { 0 };
+
+//     if (std::has_single_bit(to_u16(move.table_targets))) {
+//         if (contains_ranks(game_state.table.cards, move.table_targets)) {
+//             remove_ranks(game_state.table.cards, move.table_targets);
+
+//             // caida, +2pts
+//             if (played_card == table.last_played_card) { 
+//                 points_scored += 2;
+//                 table.last_played_card = Rank::Invalid;
+
+//             }
+//             sequence_waterfall(table.cards, played_card);
+//         }
+
+//         else {
+//             table.last_played_card = played_card;
+//             add_ranks(table.cards, move.table_targets);
+//         }
+//     }
+
+//     // Move is an addition
+//     else {
+//         if (contains_ranks(table.cards, move.table_targets)) {
+//             remove_ranks(table.cards, move.table_targets);
+//             sequence_waterfall(table.cards, played_card);
+//             table.last_played_card = Rank::Invalid;
+//         }
+//         else { 
+//             throw std::invalid_argument("Invalid RankMask used, cards are not on the table.\n"); 
+//         }
+//     }
+
+//     // limpia, +2 points
+//     if (to_u16(table.cards) == 0) {
+//         points_scored += 2;
+//     }
+
+//     remove_card_from_hand(hand, played_card);
+//     return points_scored;
+// }
+
 
 int play_card(const Move& move, Hand& hand, Table& table) {
 
     assert(is_valid_move(move, table) && "play_card precondition violated");
 
-    int maximum_played_bit { NUM_RANK_BITS - std::countl_zero(to_u16(move.table_targets)) };
-    Rank played_card { int_to_rank(maximum_played_bit) };
+    int largest_bit  { NUM_RANK_BITS - std::countl_zero(to_u16(move.table_targets)) };
+    Rank played_card { int_to_rank(largest_bit) };
 
     int points_scored { 0 };
 
     // Move is a simple capture or add-to-table, non-addition
     if (std::has_single_bit(to_u16(move.table_targets))) {
-
         if (contains_ranks(table.cards, move.table_targets)) {
-            
             remove_ranks(table.cards, move.table_targets);
 
             // caida, +2pts
             if (played_card == table.last_played_card) { 
                 points_scored += 2;
-                table.last_played_card = Rank::Invalid; //NEED TO DO FOR ADDITION
+                table.last_played_card = Rank::Invalid;
 
             }
             sequence_waterfall(table.cards, played_card);
@@ -102,6 +151,7 @@ int play_card(const Move& move, Hand& hand, Table& table) {
         if (contains_ranks(table.cards, move.table_targets)) {
             remove_ranks(table.cards, move.table_targets);
             sequence_waterfall(table.cards, played_card);
+            table.last_played_card = Rank::Invalid;
         }
         else { 
             throw std::invalid_argument("Invalid RankMask used, cards are not on the table.\n"); 
@@ -113,6 +163,8 @@ int play_card(const Move& move, Hand& hand, Table& table) {
         points_scored += 2;
     }
 
+    remove_card_from_hand(hand, played_card);
     return points_scored;
+
 }
 }
