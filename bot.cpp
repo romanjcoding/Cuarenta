@@ -13,10 +13,21 @@ constexpr int heuristic_value(const Cuarenta::Game_State& game_state) {
            Cuarenta::opposing_player_state(game_state).score;
 };
 
-int deterministic_value(Cuarenta::Game_State game_state) {
-    Cuarenta::update_captured_cards(game_state);
+constexpr int deterministic_value(const Cuarenta::Game_State& game_state) {
+
+    int captured_cards_score { 0 };
+
+    for (const Cuarenta::Player_State& player_state : game_state.players) {
+
+        // Scoring rules: 20 cards = 6pts, 22 cards = 8pts, etc.
+        if (player_state.score >= 20) {
+            captured_cards_score = 6 + (player_state.score - 20) / 2;
+        }
+    }
+
     return Cuarenta::current_player_state(game_state).score - 
-           Cuarenta::opposing_player_state(game_state).score;
+           Cuarenta::opposing_player_state(game_state).score + 
+           captured_cards_score;
 }
 
 void monte_carlo_generation();
@@ -30,8 +41,7 @@ int minimax(Cuarenta::Game_State& game_state, const int depth, const std::string
     }
 
     // [ cards exhausted -> redraw hand? ]
-    if (Cuarenta::current_player_state(game_state).hand.cards.empty() &&
-        Cuarenta::opposing_player_state(game_state).hand.cards.empty()) {            
+    if (Cuarenta::current_player_state(game_state).hand.cards.empty()) {
             int h { deterministic_value(game_state) };
             std::cout << line_so_far << " => " << h << '\n';
             return h;
@@ -48,6 +58,9 @@ int minimax(Cuarenta::Game_State& game_state, const int depth, const std::string
             Cuarenta::current_player_state(game_state).hand
         ) };
 
+    if (possible_moves.size() == 0) { 
+        std::cout << "ERROR: size of possible moves is 0." << '\n';
+    }
     
     int value { std::numeric_limits<int>::min() };
 

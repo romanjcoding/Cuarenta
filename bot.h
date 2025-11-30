@@ -6,7 +6,7 @@
 namespace Bot {
 
 constexpr int heuristic_value(const Cuarenta::Game_State& game_state);
-int deterministic_value(Cuarenta::Game_State game_state);
+constexpr int deterministic_value(const Cuarenta::Game_State& game_state);
 
 void monte_carlo_generation();
 
