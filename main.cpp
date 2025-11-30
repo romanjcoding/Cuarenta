@@ -1,9 +1,11 @@
 #include "cuarenta.h"
+#include "movegen.h"
 #include "bot.h"
+#include <bitset>
+#include <iomanip>
 
 int main() {
 
-    Cuarenta::Game1v1 game{};
     // Cuarenta::Hand hand1 = Cuarenta::generate_hand(game.deck);
     // Cuarenta::Hand hand2 = Cuarenta::generate_hand(game.deck);
 
@@ -13,8 +15,7 @@ int main() {
         Cuarenta::Rank::Six,
         Cuarenta::Rank::Seven,
         Cuarenta::Rank::Four,
-        Cuarenta::Rank::Queen }
-    };
+    } };
 
     Cuarenta::Hand hand2 { {
         Cuarenta::Rank::Ace,
@@ -22,49 +23,35 @@ int main() {
         Cuarenta::Rank::Three,
         Cuarenta::Rank::Two,
         Cuarenta::Rank::Five,
-        Cuarenta::Rank::Seven } 
-    };
+    } };
 
-    hand1.print_hand();
-    hand2.print_hand();
+    Cuarenta::Game_State game { hand1, hand2 };
 
-    Cuarenta::play_card(
-        Cuarenta::Move{ Cuarenta::RankMask{0b0000000000000001} }, 
-        hand1,
-        game.table); // A
+    game.players[0].hand.print_hand();
+    game.players[1].hand.print_hand();
+    
+    game.to_move = Cuarenta::Player::P1;
 
-    Cuarenta::play_card(
-        Cuarenta::Move{ Cuarenta::RankMask{0b0000000000001000} }, 
-        hand2,
-        game.table); // 4
+    std::vector<Cuarenta::Move> moves { Cuarenta::generate_all_moves(game.table, game.players[0].hand) };
 
-    Cuarenta::play_card(
-        Cuarenta::Move{ Cuarenta::RankMask{0b0000000000100000} }, 
-        hand1,
-        game.table); // 6
+    std::cout << "All Possible Moves: " << '\n';
+    for (size_t i = 0; i < moves.size(); i++) {
 
-    Cuarenta::play_card(
-        Cuarenta::Move{ Cuarenta::RankMask{0b0000000001000000} }, 
-        hand1,
-        game.table); // 7
+        std::bitset<16> x{Cuarenta::to_u16(moves[i].targets_mask)};
+        std::cout << "Move #" << std::left << std::setw(2) << i+1 << ": " << x << '\n';
 
-    Cuarenta::play_card(
-        Cuarenta::Move{ Cuarenta::RankMask{0b0000000100000000} }, 
-        hand1,
-        game.table); // K
+        Cuarenta::print_move(game, moves[i]);
+    }
 
-
+    std::cout << "======CURRENT BOARD=====\n";
+    game.players[0].hand.print_hand();
+    game.players[1].hand.print_hand();
     game.table.print_table();
-    // Bot::generate_all_moves(hand1, game.table);
+    std::cout << "========================\n";
 
+    int depth {10};
+    std::cout << "Bot best moves (depth = " << depth << "): \n" 
+              << Bot::minimax(game, depth, "") << '\n';
 
-    Cuarenta::play_card(
-        Cuarenta::Move{ Cuarenta::RankMask{0b0000000000011001} }, 
-        hand1,
-        game.table); // 5
-
-    // Cuarenta::play_card(hand1.cards[1], game.table, 3); // 5
-
-    game.table.print_table();
     return 0;
 }

@@ -5,9 +5,11 @@
 
 namespace Bot {
 
-constexpr int heuristic_value(Cuarenta::Game_State& game_state);
+constexpr int heuristic_value(const Cuarenta::Game_State& game_state);
+int deterministic_value(Cuarenta::Game_State game_state);
+
 void monte_carlo_generation();
 
-int minimax(Cuarenta::Game_State&, const int depth);
+int minimax(Cuarenta::Game_State& game_state, const int depth, const std::string& line_so_far);
 
 }
