@@ -1,8 +1,10 @@
 #include "cuarenta.h"
 #include "movegen.h"
+#include "cli.h"
 #include "bot.h"
 #include <bitset>
 #include <iomanip>
+#include <utility>
 
 int main() {
 
@@ -10,48 +12,64 @@ int main() {
     // Cuarenta::Hand hand2 = Cuarenta::generate_hand(game.deck);
 
     Cuarenta::Hand hand1 { {
-        Cuarenta::Rank::Ace,
-        Cuarenta::Rank::Five,
-        Cuarenta::Rank::Six,
-        Cuarenta::Rank::Seven,
         Cuarenta::Rank::Four,
+        Cuarenta::Rank::Jack,
+        Cuarenta::Rank::Six,
+        Cuarenta::Rank::Five,
+        Cuarenta::Rank::Seven,
     } };
 
     Cuarenta::Hand hand2 { {
-        Cuarenta::Rank::Ace,
-        Cuarenta::Rank::Four,
-        Cuarenta::Rank::Three,
         Cuarenta::Rank::Two,
-        Cuarenta::Rank::Five,
+        Cuarenta::Rank::Three,
+        Cuarenta::Rank::Three,
+        Cuarenta::Rank::Ace,
+        Cuarenta::Rank::Ace,
     } };
 
     Cuarenta::Game_State game { hand1, hand2 };
-
-    game.players[0].hand.print_hand();
-    game.players[1].hand.print_hand();
+    int depth { 10 };
+    run_cuarenta_cli(game, depth);
     
-    game.to_move = Cuarenta::Player::P1;
+    // game.to_move = Cuarenta::Player::P1;
+    // int depth { 10 };
 
-    std::vector<Cuarenta::Move> moves { Cuarenta::generate_all_moves(game.table, game.players[0].hand) };
+    // auto print_best_move = [&](Cuarenta::Game_State& game, int depth) {
+    //     auto [eval, move] = Bot::choose_best_move(game, depth);
 
-    std::cout << "All Possible Moves: " << '\n';
-    for (size_t i = 0; i < moves.size(); i++) {
+    //     std::cout << "Bot best move (" 
+    //             << (game.to_move == Cuarenta::Player::P1 ? "P1" : "P2")
+    //             << ", depth = " << depth
+    //             << ", eval = " << ((eval >= 0) ? "+" : "") << eval << ")\n"
+    //             << "  play:     " << Cuarenta::mask_to_str(move.targets_mask) << '\n'
+    //             << "  bitmask:  " << std::bitset<16>{to_u16(move.targets_mask)} << "\n\n";
 
-        std::bitset<16> x{Cuarenta::to_u16(moves[i].targets_mask)};
-        std::cout << "Move #" << std::left << std::setw(2) << i+1 << ": " << x << '\n';
+    //     game = Cuarenta::make_move(game, move);
+    // };
 
-        Cuarenta::print_move(game, moves[i]);
-    }
+    // for (int turn = 0; turn < 10; turn++) {
+    //     print_best_move(game, depth);
+    //     game.to_move = (game.to_move == Cuarenta::Player::P1)
+    //                 ? Cuarenta::Player::P2
+    //                 : Cuarenta::Player::P1;
+    // }
+    
+    // std::vector<Cuarenta::Move> moves { Cuarenta::generate_all_moves(game.table, game.players[0].hand) };
 
-    std::cout << "======CURRENT BOARD=====\n";
-    game.players[0].hand.print_hand();
-    game.players[1].hand.print_hand();
-    game.table.print_table();
-    std::cout << "========================\n";
+    // std::cout << "All Possible Moves: " << '\n';
+    // for (size_t i = 0; i < moves.size(); i++) {
 
-    int depth {10};
-    std::cout << "Bot best moves (depth = " << depth << "): \n" 
-              << Bot::minimax(game, depth, "") << '\n';
+    //     std::bitset<16> x{Cuarenta::to_u16(moves[i].targets_mask)};
+    //     std::cout << "Move #" << std::left << std::setw(2) << i+1 << ": " << x << '\n';
+
+    //     Cuarenta::print_move(game, moves[i]);
+    // }
+
+    // std::cout << "======CURRENT BOARD=====\n";
+    // game.players[0].hand.print_hand();
+    // game.players[1].hand.print_hand();
+    // game.table.print_table();
+    // std::cout << "========================\n";
 
     return 0;
 }

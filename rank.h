@@ -68,6 +68,54 @@ constexpr std::string rank_to_str (Rank rank) {
     return "?";
 }
 
+constexpr std::string mask_to_str(RankMask mask) {
+    std::string out;
+
+    uint16_t bits = to_u16(mask) & ALL_RANK_BITS;
+    if (bits == 0) {
+        return out;
+    }
+
+    // Find the highest (top) bit
+    Rank top_rank = Rank::Invalid;
+    for (int i = NUM_RANK_BITS - 1; i >= 0; --i) {
+        uint16_t bit = static_cast<uint16_t>(1u << i);
+        if (bits & bit) {
+            top_rank = to_rank(bit);
+            bits &= static_cast<uint16_t>(~bit);
+            break;
+        }
+    }
+
+    if (!is_valid_rank(top_rank) || top_rank == Rank::Invalid) {
+        return out;
+    }
+
+    out += rank_to_str(top_rank);
+
+    if (bits == 0) {
+        return out;
+    }
+
+    // " = other1+other2+..."
+    out += " = ";
+
+    bool first = true;
+    for (int i = 0; i < NUM_RANK_BITS; ++i) {
+        uint16_t bit = static_cast<uint16_t>(1u << i);
+        if (bits & bit) {
+            if (!first) {
+                out += "+";
+            }
+            out += rank_to_str(to_rank(bit));
+            first = false;
+        }
+    }
+
+    return out;
+}
+
+
 constexpr int rank_to_int (Rank rank) {
     return NUM_RANK_BITS - std::countl_zero(to_u16(rank));
 }
@@ -104,6 +152,10 @@ constexpr Rank& operator++(Rank& rank, int) {
 
 constexpr bool operator<(Rank a, Rank b) {
     return rank_to_int(a) < rank_to_int(b);
+}
+
+bool inline contains_ranks(RankMask cards, RankMask ranks) {
+    return (to_u16(cards) & to_u16(ranks));
 }
 
 }
