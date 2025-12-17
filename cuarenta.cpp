@@ -77,6 +77,16 @@ int sequence_waterfall (RankMask& cards, const Rank start_card) {
     return num_cards_sequenced;
 }
 
+void update_captured_cards(Game_State& game_state) {
+    for (Player_State& player_state : game_state.players) {
+
+        // Scoring rules: 20 cards = 6pts, 22 cards = 8pts, etc.
+        if (player_state.score >= 20) {
+            player_state.score += 6 + (20 - player_state.score) / 2;
+        }
+    }
+}
+
 // TODO : Fix Last_Played_card
 Game_State make_move(Game_State game_state, const Move& move) {
 
@@ -87,10 +97,8 @@ Game_State make_move(Game_State game_state, const Move& move) {
     const bool is_single_capture { std::has_single_bit(to_u16(targets_mask)) };
     const bool targets_exist     { contains_ranks(table.cards, targets_mask) };
 
-    const int largest_bit  { NUM_RANK_BITS - std::countl_zero(to_u16(targets_mask)) };
-    const Rank played_card { int_to_rank(largest_bit) };
+    const Rank played_card { move.get_played_rank() };
 
-    // Non-single "addition" move must actually capture something
     if (!is_single_capture && !targets_exist) {
         throw std::invalid_argument(
             "Invalid RankMask used, cards are not on the table.\n"
@@ -104,33 +112,36 @@ Game_State make_move(Game_State game_state, const Move& move) {
     }
 
     // TODO: Check if sums to correct value.
-
     if (!targets_exist) {
         table.last_played_card = played_card;
         add_ranks(table.cards, targets_mask);
     }
-
     else {
 
         // Caída: +2 points
         if (is_single_capture && played_card == table.last_played_card) {
+            std::cout << "Caída!" << '\n';
             player_state.score += 2;
         }
 
         const int num_waterfalled_cards { 
             sequence_waterfall(table.cards, played_card) };
         
-        const int num_captured_cards { is_single_capture ? 
-            1 : std::popcount(to_u16(targets_mask)) + num_waterfalled_cards };
+        std::cout << num_waterfalled_cards << "\n";
 
-        player_state.captured_cards += num_captured_cards;
+        const int num_captured_cards { (is_single_capture ? 
+            2 : std::popcount(to_u16(targets_mask))) + num_waterfalled_cards };
+
+        player_state.num_captured_cards += num_captured_cards;
         
-        remove_ranks(table.cards, targets_mask);
+        if (is_single_capture) { remove_ranks(table.cards, targets_mask); }
+        else { remove_ranks(table.cards, targets_mask & ~to_mask(played_card)); }
         table.last_played_card = Rank::Invalid;
     }
 
     // Limpia: +2 points
     if (to_u16(table.cards) == 0) {
+        std::cout << "Limpia!" << '\n';
         player_state.score += 2;
     }
 
@@ -160,7 +171,7 @@ void print_move(const Game_State& game_state, const Move& move) {
     std::cout << "Player: "
               << (current_player == Player::P1 ? "P1" : "P2")
               << " | score: "          << pstate.score 
-              << " | captured: "       << pstate.captured_cards
+              << " | captured: "       << pstate.num_captured_cards
               << " | hand size: "      << pstate.hand.cards.size()
               << '\n';
 
@@ -180,6 +191,10 @@ void print_move(const Game_State& game_state, const Move& move) {
 
     std::cout << "Targets "            << (targets_exist ? "do" : "do not")
               << " exist on the table.\n";
+
+    std::cout << "Playing will yield " 
+    << current_player_state(make_move(game_state, move)).score - pstate.score 
+    << " points.\n";
 
     std::cout << "========================================================\n";
 }

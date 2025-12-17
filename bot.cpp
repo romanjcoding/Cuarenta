@@ -5,8 +5,13 @@
 #include <limits>
 #include <algorithm>
 #include <bit>
+#include <utility>
+#include <random>
+#include <iomanip>
 
 namespace Bot {
+
+enum class BotType : uint8_t { CHILD, ROBOT, OLDMAN, CHEAT };
 
 constexpr int heuristic_value(const Cuarenta::Game_State& game_state) {
     return Cuarenta::current_player_state(game_state).score - 
@@ -30,80 +35,102 @@ constexpr int deterministic_value(const Cuarenta::Game_State& game_state) {
            captured_cards_score;
 }
 
-void monte_carlo_generation();
+Cuarenta::Move make_move(const Cuarenta::Game_State& game_state, BotType bot) {
+    switch (bot) {
+        case BotType::CHILD:
+            return choose_best_move(game_state, 1).second; // low montecarlo
+        case BotType::ROBOT:
+            return choose_best_move(game_state, 2).second;
+        case BotType::OLDMAN:
+            return choose_best_move(game_state, 4).second;
+        case BotType::CHEAT:
+            return choose_best_move(game_state, 10).second;
+    }
+}
 
-int minimax(Cuarenta::Game_State& game_state, const int depth, const std::string& line_so_far) {
+size_t monte_carlo_idx(std::array<double, Cuarenta::NUM_CARDS> prob) {
+
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+
+    for (size_t idx = 1; idx < prob.size(); idx++) {
+        prob[idx] += prob[idx - 1];
+    }
+    
+    double tot_sum { prob[prob.size() - 1] };
+    std::uniform_real_distribution<> dis(0, tot_sum);
+    double rand { dis(gen) };
+
+    auto it      { std::ranges::lower_bound(prob, rand) };    
+    size_t index { static_cast<size_t>(std::distance(prob.begin(), it)) };
+    return index;
+}
+
+int minimax(Cuarenta::Game_State& game_state, const int depth) {
 
     if (Cuarenta::opposing_player_state(game_state).score >= 40) {
-        int h { std::numeric_limits<int>::min() };
-        std::cout << line_so_far << " => " << h << '\n';
-        return h;
+        return std::numeric_limits<int>::min();
     }
 
     // [ cards exhausted -> redraw hand? ]
     if (Cuarenta::current_player_state(game_state).hand.cards.empty()) {
-            int h { deterministic_value(game_state) };
-            std::cout << line_so_far << " => " << h << '\n';
-            return h;
+        return deterministic_value(game_state);
     }
 
-    if (depth == 0) { 
-        int h { heuristic_value(game_state) };
-        std::cout << line_so_far << " => " << h << '\n';
-        return h;
-    }
+    if (depth == 0) { return heuristic_value(game_state); }
 
     std::vector<Cuarenta::Move> possible_moves { Cuarenta::generate_all_moves(
             game_state.table, 
             Cuarenta::current_player_state(game_state).hand
         ) };
 
-    if (possible_moves.size() == 0) { 
-        std::cout << "ERROR: size of possible moves is 0." << '\n';
-    }
-    
     int value { std::numeric_limits<int>::min() };
-
     for (const Cuarenta::Move& move : possible_moves) {
-
-        uint16_t mask = to_u16(move.targets_mask);
-        int msb_index = Cuarenta::NUM_RANK_BITS - std::countl_zero(mask);
-        Cuarenta::Rank played_card { Cuarenta::int_to_rank(msb_index) };
-
-        std::string new_line {
-            line_so_far + " " + Cuarenta::rank_to_str(played_card)
-        };
-
-        if (!std::has_single_bit(mask)) {
-            new_line += '(';
-
-            // Strip off the MSB to get “everything but the MSB”
-            Cuarenta::RankMask additions_mask {
-                move.targets_mask & ~Cuarenta::to_mask(played_card)
-            };
-
-            bool first = true;
-            for (int bit = 1; bit <= rank_to_int(Cuarenta::Rank::King); bit++) {
-
-                Cuarenta::Rank rank        { Cuarenta::int_to_rank(bit) };
-                Cuarenta::RankMask bitmask { Cuarenta::to_mask(rank) };
-
-                if ((additions_mask & bitmask) != Cuarenta::RankMask{}) {
-                    if (!first) {
-                        new_line += '+';
-                    }
-                    new_line += Cuarenta::rank_to_str(rank);
-                    first = false;
-                }
-            }
-            new_line += ')';
-        }
 
         Cuarenta::Game_State updated_state = Cuarenta::make_move(game_state, move);
         updated_state.advance_turn();
-        value = std::max(value, -minimax(updated_state, depth - 1, new_line));
+        value = std::max(value, -minimax(updated_state, depth - 1));
     }
     return value;
+}
+
+// TODO: Change into legible, not .first and .second
+std::pair<int, Cuarenta::Move>
+choose_best_move(const Cuarenta::Game_State& game_state, 
+                const int depth) {
+
+    std::vector<Cuarenta::Move> possible_moves { Cuarenta::generate_all_moves(
+            game_state.table, 
+            Cuarenta::current_player_state(game_state).hand
+        ) };
+
+    if (possible_moves.empty()) {
+        return { heuristic_value(game_state), Cuarenta::Move{} };
+    }
+
+    int best_value = std::numeric_limits<int>::min();
+    Cuarenta::Move best_move = possible_moves.front();
+
+    for (const Cuarenta::Move& move : possible_moves) {
+
+        Cuarenta::Game_State updated_state = Cuarenta::make_move(game_state, move);
+        updated_state.advance_turn();
+
+        int value = -minimax(updated_state, depth - 1);
+
+        std::cout << "Analyzed move: "
+          << std::left << std::setw(15) << Cuarenta::mask_to_str(move.targets_mask)
+          << " eval = "
+          << ((value > 0) ? "+" : "")
+          << value << "\n";
+
+        if (value > best_value) {
+            best_value = value;
+            best_move = move;
+        }
+    }
+
+    return { best_value, best_move };
 }
 
 }

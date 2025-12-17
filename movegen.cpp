@@ -19,7 +19,7 @@ std::vector<Move> generate_all_moves(const Table& table, const Hand& hand) {
 
         for (const RankMask addition_pattern : ADDITIONS_BY_RANK[rank_idx]) {
             if ((addition_pattern & low_table_mask) == addition_pattern) {
-                moves.push_back(Move{addition_pattern | to_mask(card)});
+                moves.emplace_back(Move{addition_pattern | to_mask(card)});
             }
         }
     }
