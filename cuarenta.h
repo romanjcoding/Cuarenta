@@ -12,25 +12,6 @@ namespace Cuarenta {
 
 static constexpr int NUM_CARDS {40};
 
-struct Card {
-    Rank rank_;
-    bool operator==(const Card& card) const { return card.rank_ == rank_; }
-};
-
-struct Deck {
-    std::vector<Rank> cards;
-};
-
-// Invariant: in table_targets, the MSB is the played card rank.
-// Any lower bits (if present) are addition sums.
-struct Move {
-    RankMask targets_mask{0};
-    Rank get_played_rank() const {
-        const int largest_bit  { NUM_RANK_BITS - std::countl_zero(to_u16(targets_mask)) };
-        return int_to_rank(largest_bit);
-    }
-};
-
 Deck make_cuarenta_deck();
 Hand generate_hand(Deck& d);
 

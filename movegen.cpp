@@ -5,14 +5,14 @@
 
 namespace Cuarenta {
 
-std::vector<Move> generate_all_moves(const Table& table, const Hand& hand) {   
+std::vector<Move> generate_all_moves(const Game_State& game) {   
 
     std::vector<Move> moves;
     moves.reserve(MAX_MOVES_PER_TABLE);
 
-    const RankMask low_table_mask = table.cards & LOW_MASK;
+    const RankMask low_table_mask = game.table.cards & LOW_MASK;
 
-    for (const Rank& card : hand.cards) {
+    for (const Rank& card : current_player_state(game).hand.cards) {
 
         moves.push_back(Move{to_mask(card)});
         const int rank_idx { rank_to_int(card) };

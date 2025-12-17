@@ -1,21 +1,73 @@
 #pragma once
 #include "rank.h"
-#include "cuarenta.h"
+
 #include <vector>
 #include <iostream>
+#include <random>
+#include <algorithm>
+
+#include "cuarenta.h"
 
 namespace Cuarenta {
 
+
+struct Card {
+    Rank rank_;
+    bool operator==(const Card& card) const { return card.rank_ == rank_; }
+};
+
 struct Hand {
-
    std::vector<Rank> cards;
-
    void print_hand() { 
         std::cout << "Hand: ";
         for (const Rank& rank : cards) {
             std::cout << rank_to_str(rank);
         }
         std::cout << '\n';
+    }
+};
+
+struct Deck {
+    std::vector<Rank> cards;
+
+    Deck(bool shuffled = true) {
+        cards.reserve(40);
+        static constexpr Rank ranks[] = {
+            Rank::Ace,
+            Rank::Two, Rank::Three, Rank::Four, Rank::Five, Rank::Six, Rank::Seven,
+            Rank::Jack, Rank::Queen, Rank::King
+        };
+        for (Rank r : ranks) {
+            for (int i=0; i<4; i++) {
+                cards.push_back(r);
+            }
+        }
+        if (shuffled) {
+            std::random_device rd;
+            std::mt19937 g(rd());
+            std::shuffle(cards.begin(), cards.end(), g);
+        }
+    }
+
+    Hand draw_hand() {
+        if (cards.size() < 5) {
+            throw std::runtime_error("Error: deck too small");
+        }
+        Hand h{};
+        h.cards.reserve(5);
+        std::move(cards.begin(), cards.begin() + 5, std::back_inserter(h.cards));
+        cards.erase(cards.begin(), cards.begin() + 5);
+        return h;
+    }
+};
+
+// Invariant: in table_targets, the MSB is the played card rank.
+// Any lower bits (if present) are addition sums.
+struct Move {
+    RankMask targets_mask{0};
+    Rank get_played_rank() const {
+        const int largest_bit  { NUM_RANK_BITS - std::countl_zero(to_u16(targets_mask)) };
+        return int_to_rank(largest_bit);
     }
 };
 
@@ -47,11 +99,14 @@ constexpr size_t to_index(const Player player) { return static_cast<size_t>(play
 
 struct Game_State {
     Table table{};
+    Deck deck{};
     std::array<Player_State, to_index(Player::NUM_PLAYERS)> players {{
         { Hand{}, 0, 0 },
         { Hand{}, 0, 0 }
     }};
     Player to_move { Player::P1 };
+
+    Game_State() {}
 
     Game_State(const Hand& hand1, const Hand& hand2) 
         : table{},

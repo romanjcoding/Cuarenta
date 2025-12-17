@@ -8,41 +8,8 @@
 
 namespace Cuarenta {
 
-Deck make_cuarenta_deck() {
-
-    Deck d;
-    d.cards.reserve(40);
-
-    static constexpr Rank ranks[] = {
-        Rank::Ace,
-        Rank::Two, Rank::Three, Rank::Four, Rank::Five, Rank::Six, Rank::Seven,
-        Rank::Jack, Rank::Queen, Rank::King
-    };
-
-    for (Rank r : ranks) {
-        for (int i=0; i<4; i++) {
-            d.cards.push_back(r);
-        }
-    }
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(d.cards.begin(), d.cards.end(), g);
-    return d;
-}
-
 bool is_valid_move(const Move& move, const Table& table) {
     return true;
-}
-
-Hand generate_hand(Deck& d) {
-    if (d.cards.size() < 5) {
-        throw std::runtime_error("Error: deck too small");
-    }
-    Hand h;
-    h.cards.reserve(5);
-    std::move(d.cards.begin(), d.cards.begin() + 5, std::back_inserter(h.cards));
-    d.cards.erase(d.cards.begin(), d.cards.begin() + 5);
-    return h;
 }
 
 void remove_ranks(RankMask& cards, const RankMask to_remove) {
@@ -120,15 +87,12 @@ Game_State make_move(Game_State game_state, const Move& move) {
 
         // Caída: +2 points
         if (is_single_capture && played_card == table.last_played_card) {
-            std::cout << "Caída!" << '\n';
             player_state.score += 2;
         }
 
         const int num_waterfalled_cards { 
             sequence_waterfall(table.cards, played_card) };
         
-        std::cout << num_waterfalled_cards << "\n";
-
         const int num_captured_cards { (is_single_capture ? 
             2 : std::popcount(to_u16(targets_mask))) + num_waterfalled_cards };
 
@@ -141,7 +105,6 @@ Game_State make_move(Game_State game_state, const Move& move) {
 
     // Limpia: +2 points
     if (to_u16(table.cards) == 0) {
-        std::cout << "Limpia!" << '\n';
         player_state.score += 2;
     }
 

@@ -32,5 +32,5 @@ constexpr RankMask LOW_MASK { to_mask(Rank::Ace)   | to_mask(Rank::Two)  |
                               to_mask(Rank::Three) | to_mask(Rank::Four) |
                               to_mask(Rank::Five)  | to_mask(Rank::Six) };
 
-std::vector<Move> generate_all_moves(const Table& table, const Hand& hand);
+std::vector<Move> generate_all_moves(const Game_State& game_state);
 }
