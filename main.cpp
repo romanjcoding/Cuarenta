@@ -27,9 +27,27 @@ int main() {
         Cuarenta::Rank::Ace,
     } };
 
-    Cuarenta::Game_State game { hand1, hand2 };
-    int depth { 10 };
-    run_cuarenta_cli(game, depth);
+    Cuarenta::Game_State game{};
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand = game.deck.draw_hand();
+        player.hand.print_hand();
+    }
+    auto moves { Bot::evaluate_all_moves_mc(Bot::BotType::ROBOT, game, 10) };
+    for (Bot::Move_Eval& mev : moves) {
+        std::cout << "Analyzed move: "
+        << std::left << std::setw(15) << Cuarenta::mask_to_str(mev.move.targets_mask)
+        << " eval = "
+        << ((mev.value > 0) ? "+" : "")
+        << mev.value << "\n";
+    }
+    // print_move(game, move.move);
+    // std::cout << "\n\n\n";
+    // game = Cuarenta::make_move(game, move.move);
+    // game.advance_turn();
+
+    // int depth { 10 };
+    
+    // run_cuarenta_cli(game, depth);
     
     // game.to_move = Cuarenta::Player::P1;
     // int depth { 10 };

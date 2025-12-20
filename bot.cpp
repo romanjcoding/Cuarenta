@@ -74,33 +74,43 @@ int minimax(Cuarenta::Game_State& game_state, const int depth) {
     return value;
 }
 
-std::vector<Move_Eval> evaluate_all_moves(
-    const Cuarenta::Game_State& game_state, 
+std::vector<Move_Eval> evaluate_all_moves_mc(
+    const Bot& bot,
+    Cuarenta::Game_State game_state, 
     const int depth) {
 
-    std::vector<Cuarenta::Move> avialable_moves  { Cuarenta::generate_all_moves(game_state) };
-    std::vector<Move_Eval>      move_evaluations {};
-    move_evaluations.reserve(avialable_moves.size());
+    std::vector<Cuarenta::Move> avialable_moves { Cuarenta::generate_all_moves(game_state) };
 
-    if (avialable_moves.empty()) { 
+    if (avialable_moves.empty()) {
         std::cout << "No available moves to evaluate.\n";
         return {}; 
     }
+    std::vector<Move_Eval> move_evaluations(avialable_moves.size());
 
-    for (const Cuarenta::Move& move : avialable_moves) {
+    int NUM_ITER { 100 };
 
-        Cuarenta::Game_State updated_state = Cuarenta::make_move(game_state, move);
-        updated_state.advance_turn();
+    for (int i{}; i<NUM_ITER; i++) {
 
-        int value = -minimax(updated_state, depth - 1);
+        Cuarenta::opposing_player_state(game_state).hand = Cuarenta::Hand{ {
+                idx_to_rank(monte_carlo_idx(bot.hand_probabilities_)), 
+                idx_to_rank(monte_carlo_idx(bot.hand_probabilities_)), 
+                idx_to_rank(monte_carlo_idx(bot.hand_probabilities_)), 
+                idx_to_rank(monte_carlo_idx(bot.hand_probabilities_)), 
+                idx_to_rank(monte_carlo_idx(bot.hand_probabilities_)) } };
+        
+        // Cuarenta::opposing_player_state(game_state).hand.print_hand();
 
-        std::cout << "Analyzed move: "
-          << std::left << std::setw(15) << Cuarenta::mask_to_str(move.targets_mask)
-          << " eval = "
-          << ((value > 0) ? "+" : "")
-          << value << "\n";
+        for (auto j{0uz}; j < avialable_moves.size(); j++) {
 
-        move_evaluations.push_back(Move_Eval{.move = move, .value = value});
+            Cuarenta::Game_State updated_state { Cuarenta::make_move(game_state, avialable_moves[j]) };
+            updated_state.advance_turn();
+        
+            int value = -minimax(updated_state, depth - 1);
+            move_evaluations[j].value += static_cast<float>(value);
+        }
+    }
+    for (Move_Eval& move : move_evaluations) {
+        move.value /= NUM_ITER;
     }
     return move_evaluations;
 }
@@ -114,7 +124,7 @@ Move_Eval choose_best_move(
 
     int best_value { std::numeric_limits<int>::min() };
     auto best_move { Move_Eval{ .move = avialable_moves.front(),
-                                .value = best_value } };
+                                .value = static_cast<float>(best_value) } };
 
     for (const Cuarenta::Move& move : avialable_moves) {
 
@@ -128,9 +138,10 @@ Move_Eval choose_best_move(
           << " eval = "
           << ((value > 0) ? "+" : "")
           << value << "\n";
-
+          
         if (value > best_value) {
-            best_move = Move_Eval{ .move = move, .value = value };
+            best_value = value;
+            best_move = Move_Eval{ .move = move, .value = static_cast<float>(value) };
         }
     }
     return best_move;
