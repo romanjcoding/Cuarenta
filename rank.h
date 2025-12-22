@@ -11,7 +11,7 @@ enum class RankMask : uint16_t {}; // may hold multiple bits as a mask
 enum class Rank     : uint16_t {   // singular-bitted, enforced by helper casts
     Ace=1,
     Two=2, Three=4, Four=8, Five=16, Six=32, Seven=64, 
-    Jack=128, Queen=256, King=512,
+    Jack=128, Queen=256, King=512, 
     Invalid = 0,
 };
 
@@ -131,7 +131,7 @@ constexpr RankMask operator |(const RankMask& rank_a, const RankMask& rank_b) {
     return static_cast<RankMask>(to_u16(rank_a) | to_u16(rank_b));
 }
 constexpr RankMask operator ~(const RankMask& rank) { 
-    return static_cast<RankMask>(~to_u16(rank));
+    return static_cast<RankMask>(~to_u16(rank) & ALL_RANK_BITS);
 }
 constexpr Rank& operator++(Rank& rank, int) {
     switch(rank) {
@@ -155,7 +155,7 @@ constexpr bool operator<(Rank a, Rank b) {
 }
 
 bool inline contains_ranks(RankMask cards, RankMask ranks) {
-    return (to_u16(cards) & to_u16(ranks));
+    return (to_u16(cards) & to_u16(ranks)) == to_u16(ranks);
 }
 
 }
