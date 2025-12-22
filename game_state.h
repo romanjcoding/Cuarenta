@@ -10,7 +10,6 @@
 
 namespace Cuarenta {
 
-
 struct Card {
     Rank rank_;
     bool operator==(const Card& card) const { return card.rank_ == rank_; }
@@ -30,7 +29,7 @@ struct Hand {
 struct Deck {
     std::vector<Rank> cards;
 
-    Deck(bool shuffled = true) {
+    Deck(bool shuffled = false) {
         cards.reserve(40);
         static constexpr Rank ranks[] = {
             Rank::Ace,
@@ -64,7 +63,7 @@ struct Deck {
 // Invariant: in table_targets, the MSB is the played card rank.
 // Any lower bits (if present) are addition sums.
 struct Move {
-    RankMask targets_mask{0};
+    RankMask targets_mask{};
     Rank get_played_rank() const {
         const int largest_bit  { NUM_RANK_BITS - std::countl_zero(to_u16(targets_mask)) };
         return int_to_rank(largest_bit);
@@ -117,6 +116,18 @@ struct Game_State {
           to_move{ Player::P1 } {}
 
     void advance_turn() {
+        switch (to_move) {
+            case Player::P1:
+                to_move = Player::P2;
+                break;
+            case Player::P2:
+                to_move = Player::P1;
+                break;
+            default:
+                break;
+        }
+    }
+    void unadvance_turn() {
         switch (to_move) {
             case Player::P1:
                 to_move = Player::P2;

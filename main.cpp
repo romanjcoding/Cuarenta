@@ -1,6 +1,5 @@
 #include "cuarenta.h"
 #include "movegen.h"
-#include "cli.h"
 #include "bot.h"
 #include <bitset>
 #include <iomanip>
@@ -12,34 +11,270 @@ int main() {
     // Cuarenta::Hand hand2 = Cuarenta::generate_hand(game.deck);
 
     Cuarenta::Hand hand1 { {
-        Cuarenta::Rank::Four,
-        Cuarenta::Rank::Jack,
+        Cuarenta::Rank::Ace,
+        Cuarenta::Rank::Two,
+        Cuarenta::Rank::Three,
+        Cuarenta::Rank::Ace,
         Cuarenta::Rank::Six,
-        Cuarenta::Rank::Five,
-        Cuarenta::Rank::Seven,
     } };
 
     Cuarenta::Hand hand2 { {
-        Cuarenta::Rank::Two,
+        Cuarenta::Rank::Seven,
         Cuarenta::Rank::Three,
         Cuarenta::Rank::Three,
-        Cuarenta::Rank::Ace,
-        Cuarenta::Rank::Ace,
+        Cuarenta::Rank::Six,
+        Cuarenta::Rank::Seven,
     } };
 
-    Cuarenta::Game_State game{};
+    Cuarenta::Game_State game{ hand1, hand2 };
     for (Cuarenta::Player_State& player : game.players) {
-        player.hand = game.deck.draw_hand();
         player.hand.print_hand();
     }
-    auto moves { Bot::evaluate_all_moves_mc(Bot::BotType::ROBOT, game, 10) };
-    for (Bot::Move_Eval& mev : moves) {
+    game.table.print_table();
+
+    int NUM_ITER  { 1000 };
+    auto moves    { Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 10) };
+    auto max_move { moves.front() };
+
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
         std::cout << "Analyzed move: "
-        << std::left << std::setw(15) << Cuarenta::mask_to_str(mev.move.targets_mask)
-        << " eval = "
-        << ((mev.value > 0) ? "+" : "")
-        << mev.value << "\n";
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
     }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    game.advance_turn();
+    std::cout << std::endl;
+
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand.print_hand();
+    }
+    game.table.print_table();
+
+    moves = Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 9);
+    max_move = moves.front();
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
+        std::cout << "Analyzed move: "
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
+    }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    game.advance_turn();
+    std::cout << std::endl;
+
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand.print_hand();
+    }
+    game.table.print_table();
+
+    moves = Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 9);
+    max_move = moves.front();
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
+        std::cout << "Analyzed move: "
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
+    }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    game.advance_turn();
+    std::cout << std::endl;
+
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand.print_hand();
+    }
+    game.table.print_table();
+
+    moves = Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 9);
+    max_move = moves.front();
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
+        std::cout << "Analyzed move: "
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
+    }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    game.advance_turn();
+    std::cout << std::endl;
+
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand.print_hand();
+    }
+    game.table.print_table();
+
+    moves = Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 9);
+    max_move = moves.front();
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
+        std::cout << "Analyzed move: "
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
+    }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    game.advance_turn();
+    std::cout << std::endl;
+
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand.print_hand();
+    }
+    game.table.print_table();
+
+    moves = Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 9);
+    max_move = moves.front();
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
+        std::cout << "Analyzed move: "
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
+    }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    game.advance_turn();
+    std::cout << std::endl;
+
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand.print_hand();
+    }
+    game.table.print_table();
+
+    moves = Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 9);
+    max_move = moves.front();
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
+        std::cout << "Analyzed move: "
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
+    }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    game.advance_turn();
+    std::cout << std::endl;
+
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand.print_hand();
+    }
+    game.table.print_table();
+
+    moves = Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 9);
+    max_move = moves.front();
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
+        std::cout << "Analyzed move: "
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
+    }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    game.advance_turn();
+    std::cout << std::endl;
+
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand.print_hand();
+    }
+    game.table.print_table();
+
+    moves = Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 9);
+    max_move = moves.front();
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
+        std::cout << "Analyzed move: "
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
+    }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    game.advance_turn();
+    std::cout << std::endl;
+
+    for (Cuarenta::Player_State& player : game.players) {
+        player.hand.print_hand();
+    }
+    game.table.print_table();
+
+    moves = Bot::evaluate_all_moves_mc(Bot::Bot{Bot::BotType::ROBOT, NUM_ITER}, game, 9);
+    max_move = moves.front();
+    for (const Bot::Move_Eval& mev : moves) {
+        if (mev.value > max_move.value) {
+            max_move = mev;
+        }
+        const double ci999 = 3.27 * (mev.std_dev / std::sqrt(NUM_ITER));
+        std::cout << "Analyzed move: "
+            << std::left  << std::setw(16) << Cuarenta::mask_to_str(mev.move.targets_mask)
+            << "  eval " << std::showpos << std::fixed << std::setprecision(5) << mev.value << std::noshowpos
+            << "  ± " << std::fixed << std::setprecision(5) << ci999
+            << " (99.9% CI)"
+            << "  [stddev=" << std::fixed << std::setprecision(5) << mev.std_dev << "]\n";
+    }
+
+    game = Cuarenta::make_move(game, max_move.move);
+    std::cout << std::endl;
+
+    for (auto& player : game.players) { 
+        std::cout << player.score << '\n';
+        player.hand.print_hand(); 
+        std::cout << '\n';
+    }
+    game.table.print_table();
+
     // print_move(game, move.move);
     // std::cout << "\n\n\n";
     // game = Cuarenta::make_move(game, move.move);
