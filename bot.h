@@ -12,8 +12,8 @@ enum class BotType : uint8_t { CHILD, ROBOT, OLDMAN, CHEAT };
 
 struct Move_Eval {
     Cuarenta::Move move;
-    float value; // negamax value from the current player's perspective
-    float std_dev;
+    double value; // negamax value from the current player's perspective
+    double std_dev;
 };
 
 struct Hand_Probability {
@@ -42,14 +42,14 @@ struct Bot {
     }
 };
 
-constexpr float heuristic_value(const Cuarenta::Game_State& game);
+constexpr double heuristic_value(const Cuarenta::Game_State& game);
 constexpr int deterministic_value(const Cuarenta::Game_State& game);
 
 size_t monte_carlo_idx(Hand_Probability prob);
 
 Cuarenta::Move make_move(const Cuarenta::Game_State& game, BotType bot);
 
-float minimax(Cuarenta::Game_State& game, const int depth);
+double minimax(Cuarenta::Game_State& game, const int depth);
 
 std::vector<Move_Eval> evaluate_all_moves_mc(
     const Bot& bot,

@@ -225,12 +225,17 @@ void undo_move_in_place(Game_State& game, const Undo& undo) {
         if (card_on_table) { remove_ranks(table.cards, to_mask(played_card)); }
         else               { add_ranks(table.cards, to_mask(played_card)); }
     }
+
+    if (!card_on_table || is_addition) {
+        int num_captured { (is_addition) ? std::popcount(to_u16(targets_mask)) : 2 };
+        player_state.num_captured_cards -= num_captured + undo.num_waterfalled_cards;
+    }
+
+    // keep last, as it modifies played_card
     for (int i{}; i < undo.num_waterfalled_cards; i++) {
         played_card++;
         add_ranks(table.cards, to_mask(played_card));
     }
-    player_state.num_captured_cards -= (
-        std::popcount(to_u16(targets_mask)) + undo.num_waterfalled_cards);
 }
 
 void print_move(const Game_State& game, const Move& move) {
