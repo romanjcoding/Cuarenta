@@ -65,10 +65,10 @@ double minimax(Cuarenta::Game_State& game_state, const int depth) {
         return heuristic_value(game_state); 
     }
 
-    auto available_moves { Cuarenta::generate_all_moves(game_state) };
+    const auto available_moves { Cuarenta::generate_all_moves(game_state) };
 
     double value { std::numeric_limits<double>::lowest() };
-    for (size_t i{}; i < available_moves.n; i++) {
+    for (size_t i{}; i < available_moves.size; i++) {
 
         Cuarenta::Undo undo { Cuarenta::make_move_in_place(game_state, available_moves.moves[i]) };
 
@@ -86,28 +86,28 @@ std::vector<Move_Eval> evaluate_all_moves_mc (
     Cuarenta::Game_State& game_state, 
     const int depth) {
 
-    auto available_moves { Cuarenta::generate_all_moves(game_state) };
+    const auto available_moves { Cuarenta::generate_all_moves(game_state) };
 
-    if (available_moves.n == 0) {
+    if (available_moves.size == 0) {
         std::cout << "No available moves to evaluate.\n";
         return {}; 
     }
-    std::vector<double> S1(available_moves.n);
-    std::vector<double> S2(available_moves.n);
+    std::vector<double> S1(available_moves.size);
+    std::vector<double> S2(available_moves.size);
 
     const auto opp_hand_copy { Cuarenta::opposing_player_state(game_state).hand.cards };
 
     int NUM_ITER { bot.num_mc_iters_ };
 
-    for (int _{}; _<=NUM_ITER; _++) {
+    for (int _{}; _< NUM_ITER; _++) {
 
         for (auto& rank : Cuarenta::opposing_player_state(game_state).hand.cards) {
             rank = idx_to_rank(monte_carlo_idx(bot.hand_probabilities_));
         }
 
-        for (size_t i{}; i < available_moves.n; i++) {
+        for (size_t i{}; i < available_moves.size; i++) {
 
-            Cuarenta::Undo undo { Cuarenta::make_move_in_place(game_state, available_moves.moves[i]) };
+            const Cuarenta::Undo undo { Cuarenta::make_move_in_place(game_state, available_moves.moves[i]) };
 
             game_state.advance_turn();
             double value = -minimax(game_state, depth - 1);
@@ -120,15 +120,18 @@ std::vector<Move_Eval> evaluate_all_moves_mc (
         }
         Cuarenta::opposing_player_state(game_state).hand.cards = opp_hand_copy;
     }
-    
-    std::vector<Move_Eval> move_evaluations(available_moves.n);
-    for (size_t i{}; i < move_evaluations.size(); i++) {
-        move_evaluations[i] = Move_Eval { 
+
+    std::vector<Move_Eval> move_evaluations;
+    move_evaluations.reserve(available_moves.size);
+
+    for (size_t i{}; i < available_moves.size; i++) {
+        const double mean { S1[i] / NUM_ITER };
+        const double var  { S2[i] / NUM_ITER - mean * mean };
+        move_evaluations.emplace_back(Move_Eval{ 
             .move = available_moves.moves[i],
-            .value = S1[i] / NUM_ITER,
-            .std_dev = std::sqrt(
-                    S2[i] / NUM_ITER - (S1[i] / NUM_ITER) * (S1[i] / NUM_ITER))
-        };
+            .value = mean,
+            .std_dev = std::sqrt(var) // clamp to std::max(0.0, std::sqrt(var))?
+        });
     }
     return move_evaluations;
 }
