@@ -10,11 +10,10 @@
 
 namespace Cuarenta {
 
-struct Undo {
-    Move move{};
+struct Undo { // change to MoveData?
+    Move move{}; 
     Rank last_played_card{};
     int num_waterfalled_cards{};
-    bool did_caida { false };
 };
 
 static constexpr int NUM_CARDS {40};

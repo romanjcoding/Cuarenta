@@ -71,7 +71,6 @@ Game_State make_move(Game_State game, const Move& move) {
 
     if (!is_card_in_hand(player_state.hand, played_card)) {
         player_state.hand.print_hand();
-        std::cout << rank_to_str(played_card) << '\n';
         throw std::invalid_argument(
             "Invalid RankMask used, played card (MSB in RankMask) is not in current players hand.\n"
         );
@@ -81,7 +80,7 @@ Game_State make_move(Game_State game, const Move& move) {
         if (!table_has_capture) {
             throw std::invalid_argument(
             "Invalid RankMask used, cards are not on the table.\n"
-            );
+            ); 
         }
         else {
             const int num_waterfalled_cards { 
@@ -131,8 +130,7 @@ Undo make_move_in_place(Game_State& game, const Move& move) {
 
     Undo undo { .move = move,
                 .last_played_card = table.last_played_card,
-                .num_waterfalled_cards = 0,
-                .did_caida = false };
+                .num_waterfalled_cards = 0 };
 
     const RankMask addition_mask { move.targets_mask & ~to_mask(played_card) };
     const bool table_has_capture { (is_addition)   ? 
@@ -141,7 +139,6 @@ Undo make_move_in_place(Game_State& game, const Move& move) {
 
     if (!is_card_in_hand(player_state.hand, played_card)) {
         player_state.hand.print_hand();
-        std::cout << rank_to_str(played_card) << '\n';
         throw std::invalid_argument(
             "Invalid RankMask used, played card (MSB in RankMask) is not in current players hand.\n"
         );
@@ -176,7 +173,6 @@ Undo make_move_in_place(Game_State& game, const Move& move) {
             // Caída: +2 points
             if (played_card == table.last_played_card) {
                 player_state.score += 2;
-                undo.did_caida = true;
             }
             const int num_waterfalled_cards { 
                 sequence_waterfall(table.cards, played_card) };
@@ -217,15 +213,15 @@ void undo_move_in_place(Game_State& game, const Undo& undo) {
     player_state.hand.cards.push_back(played_card);
     table.last_played_card = undo.last_played_card;
 
-    if (undo.did_caida)           { player_state.score -= 2; } // Caida
-    if (to_u16(table.cards) == 0) { player_state.score -= 2; } // Limpia
+    if ((played_card == undo.last_played_card) && !is_addition) { player_state.score -= 2; } // Caida
+    if (to_u16(table.cards) == 0)                               { player_state.score -= 2; } // Limpia
 
     if (is_addition) { add_ranks(table.cards, addition_mask); }
     else {
         if (card_on_table) { remove_ranks(table.cards, to_mask(played_card)); }
         else               { add_ranks(table.cards, to_mask(played_card)); }
     }
-
+    
     if (!card_on_table || is_addition) {
         int num_captured { (is_addition) ? std::popcount(to_u16(targets_mask)) : 2 };
         player_state.num_captured_cards -= num_captured + undo.num_waterfalled_cards;
