@@ -1,15 +1,30 @@
 #pragma once
 #include "cuarenta.h"
 #include <vector>
+#include <cassert>
 
 namespace Cuarenta {
 
 struct MoveList {
     std::array<Move, MAX_MOVES_PER_TABLE> moves{};
-    uint8_t n = 0;
+    size_t size = 0;
+
+    static constexpr size_t capacity() { return MAX_MOVES_PER_TABLE; }
+    bool full()  const { return size == capacity(); }
+    bool empty() const { return size == 0; }
+
+    inline void push_back(const Move& m) {
+        assert(size < capacity());
+        moves[size++] = m;
+    }
+
+    inline void push_back(Move&& m) {
+        assert(size < capacity());
+        moves[size++] = std::move(m);
+    }
 };
 
-constexpr std::initializer_list<RankMask> ADDITIONS_BY_RANK[] = {
+static constexpr std::initializer_list<RankMask> ADDITIONS_BY_RANK[] = {
     {},
     {},
     {},
