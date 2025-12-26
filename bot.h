@@ -5,6 +5,7 @@
 #include <vector>
 #include <array>
 #include <utility>
+#include <mdspan>
 
 namespace Bot {
 
@@ -21,13 +22,20 @@ struct Hand_Probability {
 };
 
 constexpr Cuarenta::Rank idx_to_rank(size_t idx) {
-    return Cuarenta::int_to_rank((static_cast<int>(idx) / (Cuarenta::NUM_CARDS / Cuarenta::NUM_CARD_TYPES) + 1));
+    return Cuarenta::int_to_rank((static_cast<int>(idx) / Cuarenta::NUM_CARDS_PER_RANK + 1));
 };
+
+// returns idx at the beginning of the 4 ranks
+constexpr size_t rank_to_idx(Cuarenta::Rank rank) {
+    return static_cast<size_t>(
+        (Cuarenta::rank_to_int(rank) - 1) * Cuarenta::NUM_CARDS_PER_RANK);
+}
 
 struct Bot {
     BotType bot_type_;
     Hand_Probability hand_probabilities_;
     int num_mc_iters_;
+
     Bot(BotType bot_type, int num_mc_iters) : 
         bot_type_{bot_type},
         hand_probabilities_{ std::array<double, Cuarenta::NUM_CARDS>{
@@ -37,8 +45,21 @@ struct Bot {
             1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
         } },
         num_mc_iters_{num_mc_iters} {}
-    void update_probabilities(Cuarenta::Move move) {
 
+    void update_probabilities(Cuarenta::Move enemy_move) {
+        auto played_card { enemy_move.get_played_rank() };
+        size_t idx       { rank_to_idx(played_card) };
+        for (size_t i{}; i < Cuarenta::NUM_CARDS_PER_RANK; i++) {
+            if (hand_probabilities_.p1[idx + i] > 0) {
+                hand_probabilities_.p1[idx + i] = 0;
+                break;
+            }
+        }
+    }
+    void initialize_probabilities(Cuarenta::Hand hand) {
+        for (auto& card : hand.cards) {
+            update_probabilities(Cuarenta::Move{to_mask(card)});
+        }
     }
 };
 
