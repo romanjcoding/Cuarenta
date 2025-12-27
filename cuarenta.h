@@ -17,7 +17,8 @@ struct Undo { // change to MoveData?
 };
 
 static constexpr int NUM_CARDS {40};
-static constexpr int NUM_CARD_TYPES {10};
+static constexpr int NUM_RANKS {10};
+static constexpr int NUM_CARDS_PER_RANK { NUM_CARDS / NUM_RANKS };
 
 Deck make_cuarenta_deck();
 Hand generate_hand(Deck& d);

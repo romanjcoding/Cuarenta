@@ -22,15 +22,19 @@ constexpr int deterministic_value(const Cuarenta::Game_State& game_state) {
 
     int captured_cards_score { 0 };
 
-    for (const Cuarenta::Player_State& player_state : game_state.players) {
-        // Scoring rules: 20 cards = 6pts, 22 cards = 8pts, etc.
-        if (player_state.num_captured_cards >= 20) {
-            captured_cards_score = 6 + (player_state.num_captured_cards - 20) / 2;
-        }
+    auto player { Cuarenta::current_player_state(game_state) };
+    auto enemy  { Cuarenta::opposing_player_state(game_state) };
+
+    // Scoring rules: 20 cards = 6pts, 22 cards = 8pts, etc.
+    if (player.num_captured_cards >= 20) {
+            captured_cards_score += 6 + 2 * ((player.num_captured_cards - 20) / 2);
     }
-    return Cuarenta::current_player_state(game_state).score - 
-           Cuarenta::opposing_player_state(game_state).score + 
-           captured_cards_score;
+
+    if (enemy.num_captured_cards >= 20) {
+            captured_cards_score -= 6 + 2 * ((enemy.num_captured_cards - 20) / 2);
+    }
+
+    return player.score - enemy.score + captured_cards_score;
 }
 
 size_t monte_carlo_idx(Hand_Probability prob) {

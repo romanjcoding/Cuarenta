@@ -50,7 +50,7 @@ void update_captured_cards(Game_State& game) {
 
         // Scoring rules: 20 cards = 6pts, 22 cards = 8pts, etc.
         if (player_state.score >= 20) {
-            player_state.score += 6 + (20 - player_state.score) / 2;
+            player_state.score += 6 + 2 * ((player_state.num_captured_cards - 20) / 2);
         }
     }
 }
