@@ -47,9 +47,8 @@ int sequence_waterfall (RankMask& cards, const Rank start_card) {
 
 void update_captured_cards(Game_State& game) {
     for (Player_State& player_state : game.players) {
-
         // Scoring rules: 20 cards = 6pts, 22 cards = 8pts, etc.
-        if (player_state.score >= 20) {
+        if (player_state.num_captured_cards >= 20) {
             player_state.score += 6 + 2 * ((player_state.num_captured_cards - 20) / 2);
         }
     }
