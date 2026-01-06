@@ -53,7 +53,11 @@ enum class View {
 struct InputData {
     std::optional<Bot::Bot> bot        { std::nullopt };
     std::optional<Cuarenta::Move> move { std::nullopt };
-    bool bot_stats { false };
+
+    bool play_bot   { false };
+    bool play_human { false };
+    bool bot_stats  { false };
+    
     bool help { false };
     bool quit { false };
     bool err  { false };

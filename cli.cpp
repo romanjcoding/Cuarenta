@@ -77,6 +77,8 @@ InputData read_input() {
 
     if (input == "help") { return InputData { .help = true }; }
     if (input == "quit") { return InputData { .quit = true }; }
+    if (input == "play bot")   { return InputData { .play_bot = true }; }
+    if (input == "play human") { return InputData { .play_human = true }; }
 
     std::string lhs;
     std::string rhs;
@@ -88,10 +90,42 @@ InputData read_input() {
         lhs = input;
     }
 
-    std::optional<Cuarenta::Rank> played_rank { try_parse_rank_token(lhs) };
-    if (!played_rank.has_value()) { return InputData { .err = true }; }
 
-    return InputData { .err = true };
+    auto opt { try_parse_rank_token(lhs) };
+    if (!opt.has_value()) { return InputData { .err = true }; }
+    auto played_rank = opt.value();
+
+    // Parse targets if any
+    Cuarenta::RankMask targets_mask = Cuarenta::to_mask(0);
+    if (!rhs.empty()) {
+        std::vector<Cuarenta::Rank> target_ranks;
+        std::string token;
+        auto finish_token = [&](const std::string& tok) -> bool {
+            auto b = tok.find_first_not_of(" \t");
+            auto e = tok.find_last_not_of(" \t");
+            if (b == std::string::npos) { return false; }
+            auto t { try_parse_rank_token(tok.substr(b, e - b + 1)) };
+            if (!t) { return false; }
+            target_ranks.push_back(t.value());
+            return true;
+        };
+        for (char ch : rhs) {
+            if (ch == '+') {
+                if (!finish_token(token)) { return InputData { .err = true }; }
+                token.clear();
+            } else {
+                token += ch;
+            }
+        }
+        if (!token.empty()) {
+            if (!finish_token(token)) { return InputData { .err = true }; }
+        }
+        for (auto r : target_ranks) {
+            targets_mask = targets_mask | Cuarenta::to_mask(r);
+        }
+    }
+    
+    return InputData { .move = Cuarenta::Move { targets_mask | to_mask(played_rank) } };
 }
 
 void print_cards_box(const std::vector<Cuarenta::Rank>& cards,
@@ -369,71 +403,6 @@ std::string describe_move_targets(const Cuarenta::Move &mv) {
     return played + " = " + combo;
 }
 
-int find_move_by_input(const std::string& raw_input,
-                       const Cuarenta::MoveList& moves)
-{
-    auto start { raw_input.find_first_not_of(" \t") };
-    auto end   { raw_input.find_last_not_of(" \t") };
-    if (start == std::string::npos) { return -1; }
-    std::string input = raw_input.substr(start, end - start + 1);
-
-    std::string lhs;
-    std::string rhs;
-    size_t eq_pos = input.find('=');
-    if (eq_pos != std::string::npos) {
-        lhs = input.substr(0, eq_pos);
-        rhs = input.substr(eq_pos + 1);
-    } else {
-        lhs = input;
-    }
-
-    std::optional<Cuarenta::Rank> played { try_parse_rank_token(lhs) };
-
-    // Parse targets if any
-    Cuarenta::RankMask targets_mask = Cuarenta::to_mask(0);
-    if (!rhs.empty()) {
-        std::vector<Cuarenta::Rank> target_ranks;
-        std::string token;
-        auto finish_token = [&](const std::string& tok) -> bool {
-            auto b = tok.find_first_not_of(" \t");
-            auto e = tok.find_last_not_of(" \t");
-            if (b == std::string::npos) { return false; }
-            auto t { try_parse_rank_token(tok.substr(b, e - b + 1)) };
-            if (!t) { return false; }
-            target_ranks.push_back(t.value());
-            return true;
-        };
-        for (char ch : rhs) {
-            if (ch == '+') {
-                if (!finish_token(token)) return -1;
-                token.clear();
-            } else {
-                token += ch;
-            }
-        }
-        if (!token.empty()) {
-            if (!finish_token(token)) return -1;
-        }
-        for (auto r : target_ranks) {
-            targets_mask = targets_mask | Cuarenta::to_mask(r);
-        }
-    }
-
-    int fallback = -1;
-    for (size_t i{}; i < moves.size; i++) {
-
-        const auto& mv = moves.moves[i];
-        auto addition_mask { mv.targets_mask & ~to_mask(mv.get_played_rank()) };
-
-        if (mv.get_played_rank() != played)  { continue; }
-        if (targets_mask == addition_mask)   { return static_cast<int>(i); }
-        if (rhs.empty()) {
-            fallback = static_cast<int>(i);
-        }
-    }
-    return fallback;
-}
-
 void print_scoreboard(const Cuarenta::Game_State& game) {
 
     const auto& p1 { Cuarenta::state_for(game, Cuarenta::Player::P1) };
@@ -655,14 +624,13 @@ size_t choose_move_ai(Cuarenta::Game_State& game, int depth) {
     return best_idx;
 }
 
-void run_game(std::optional<Bot::Bot> bot)
-{
+void run_game(std::optional<Bot::Bot> bot) {
+
     Cuarenta::Game_State game{};
 
     bool versus_bot{};
     if (bot) { versus_bot = true; }
     else     { versus_bot = false; }
-    
 
     std::cout << "Starting a new "
               << (versus_bot ? "human vs computer" : "human vs human")
@@ -681,7 +649,7 @@ void run_game(std::optional<Bot::Bot> bot)
                 Cuarenta::update_captured_cards(game);
                 break;
             } else {
-                current.hand = game.deck.draw_hand();
+                current.hand  = game.deck.draw_hand();
                 opponent.hand = game.deck.draw_hand();
             }
         }
@@ -704,20 +672,10 @@ void run_game(std::optional<Bot::Bot> bot)
             while (true) {
                 std::cout << "\n\nEnter move (e.g., '5' or '5 = 3 + 2'), "
                              "'help' for commands, or 'quit' to end the game: ";
-                std::string input;
-                if (!std::getline(std::cin, input)) {
-                    exit_game = true;
-                    break;
-                }
-                auto b = input.find_first_not_of(" \t");
-                auto e = input.find_last_not_of(" \t");
-                if (b != std::string::npos) {
-                    input = input.substr(b, e - b + 1);
-                } else {
-                    continue;
-                }
 
-                if (input == "help") {
+                auto input { read_input() };
+
+                if (input.help) {
                     clear_screen();
                     show_help();
                     std::cout << "\nAvailable moves:\n";
@@ -729,31 +687,34 @@ void run_game(std::optional<Bot::Bot> bot)
                     }
                     continue;
                 }
-                if (input == "quit" || input == "exit") {
+
+                if (input.quit) {
                     exit_game = true;
                     break;
                 }
-                int match { find_move_by_input(input, moves) };
-                if (match >= 0) {
-                    chosen = static_cast<size_t>(match);
-                    break;
+
+                if (input.move.has_value()) {
+                    auto move = input.move.value();
+                    size_t it = moves.find(move);
+                    if (it != moves.capacity()) {
+                        chosen = it;
+                        break;
+                    }
                 }
+
                 flash_invalid_input(game, view);
                 std::cout << "Unrecognised move. Please enter one of the moves listed above, "
                              "'help', or 'quit'.\n";
             }
-            if (exit_game) break;
         } else {
             print_game_state(game, Cuarenta::mask_to_vector(game.table.cards), view);
             chosen = choose_move_ai(game, 10);
         }
 
-        if (!exit_game) {
-            apply_move_with_animation(game, moves.moves[chosen], view);
-            game.advance_turn();
-        } else {
-            break;
-        }
+        if (exit_game) { break; }
+
+        apply_move_with_animation(game, moves.moves[chosen], view);
+        game.advance_turn();
     }
 
     if (exit_game) {
@@ -782,32 +743,34 @@ int run_cli() {
         clear_screen();
         show_banner();
         while (true) {
-            std::cout << "> ";
-            std::string cmd;
-            if (!std::getline(std::cin, cmd)) break;
 
-            auto b = cmd.find_first_not_of(" \t");
-            auto e = cmd.find_last_not_of(" \t");
-            if (b == std::string::npos) continue;
-            cmd = cmd.substr(b, e - b + 1);
+            auto input { read_input() };
 
-            if (cmd == "help") {
+            if (input.help) {
                 clear_screen();
                 show_help();
-            } else if (cmd == "play human") {
+            }
+
+            else if (input.play_human) {
                 run_game(false);
                 std::cout << "\nGame finished. Back to main menu.\n";
                 sleep_ms(1500);
                 clear_screen();
                 show_banner();
-            } else if (cmd == "play bot") {
+            }
+
+            else if (input.play_bot) {
                 Bot::Bot bot { bot_selection_screen() };
                 run_game(bot);
                 std::cout << "\nGame finished. Back to main menu.\n";
-            } else if (cmd == "quit" || cmd == "exit") {
+            }
+
+            else if (input.quit) {
                 std::cout << "Goodbye!\n";
                 break;
-            } else {
+            }
+
+            else { 
                 std::cout << "Unknown command. Type 'help' for a list of commands.\n";
             }
         }
