@@ -1,5 +1,7 @@
 #pragma once
+
 #include "cuarenta.h"
+
 #include <vector>
 #include <cassert>
 
@@ -13,14 +15,16 @@ struct MoveList {
     bool full()  const { return size == capacity(); }
     bool empty() const { return size == 0; }
 
-    inline void push_back(const Move& m) {
-        assert(size < capacity());
-        moves[size++] = m;
+    bool contains(const Move& m) const {
+        for (size_t i{}; i < size; i++) {
+            if (m.targets_mask == moves[i].targets_mask) { return true; }
+        }
+        return false;
     }
 
-    inline void push_back(Move&& m) {
+    void push_back(const Move& m) {
         assert(size < capacity());
-        moves[size++] = std::move(m);
+        moves[size++] = m;
     }
 };
 
