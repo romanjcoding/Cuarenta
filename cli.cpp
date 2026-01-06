@@ -1,3 +1,5 @@
+#include "cli.h"
+
 #include "cuarenta.h"
 #include "movegen.h"
 #include "bot.h"
@@ -5,6 +7,7 @@
 #include "rank.h"
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cctype>
 #include <iostream>
@@ -17,41 +20,79 @@
 #include <thread>
 #include <vector>
 
-namespace {
+namespace cli {
 
-void clear_screen() {
-#if defined(_WIN32)
-    std::system("cls");
-#else
-    std::cout << "\033[2J\033[H" << std::flush;
-#endif
+std::optional<Cuarenta::Rank> try_parse_rank_token(const std::string& token) {
+
+    if (token.empty()) { return std::nullopt; }
+
+    std::string normalized;
+    normalized.reserve(token.size());
+    for (char ch : token) {
+        if (!std::isspace(static_cast<unsigned char>(ch))) {
+            normalized += static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+        }
+    }
+    for (int i{1}; i <= Cuarenta::NUM_RANKS; i++) {
+        Cuarenta::Rank r { Cuarenta::int_to_rank(i) };
+        std::string rs   { Cuarenta::rank_to_str(r) };
+        std::string rs_upper;
+        for (char c : rs) {
+            rs_upper += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        }
+        if (rs_upper == normalized) {
+            return r;
+        }
+        bool numeric = !normalized.empty();
+        for (char c : normalized) {
+            if (!std::isdigit(static_cast<unsigned char>(c))) {
+                numeric = false;
+                break;
+            }
+        }
+        if (numeric) {
+            try {
+                int value = std::stoi(normalized);
+                if (value == i) {
+                    return r;
+                }
+            } catch (...) {
+            }
+        }
+    }
+    return std::nullopt;
 }
 
-inline void sleep_ms(int ms) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+InputData read_input() {
+
+    std::string input;
+    if (!std::getline(std::cin, input)) {
+        return InputData { .err = true };
+    }
+
+    auto start { input.find_first_not_of(" \t") };
+    auto end   { input.find_last_not_of(" \t") };
+    if (end == std::string::npos) { return InputData { .err = true }; }
+    input = input.substr(start, end - start + 1);
+
+    if (input == "help") { return InputData { .help = true }; }
+    if (input == "quit") { return InputData { .quit = true }; }
+
+    std::string lhs;
+    std::string rhs;
+    size_t eq_pos = input.find('=');
+    if (eq_pos != std::string::npos) {
+        lhs = input.substr(0, eq_pos);
+        rhs = input.substr(eq_pos + 1);
+    } else {
+        lhs = input;
+    }
+
+    std::optional<Cuarenta::Rank> played_rank { try_parse_rank_token(lhs) };
+    if (!played_rank.has_value()) { return InputData { .err = true }; }
+
+    return InputData { .err = true };
 }
-
-enum class View {
-    ByTurn,
-    P1Fixed
-};
-
-struct Render_Opts {
-    std::vector<size_t> table_idx_to_highlight { };
-    std::string_view table_color      { ansi::reset };
-
-    std::optional<size_t> bottom_hi_index {};
-    std::string_view bottom_color    { ansi::reset };
-
-    std::optional<size_t> top_hi_index {};
-    std::string_view top_color       { ansi::reset };
-
-    bool error_flash { false };
-
-    std::string banner {};
-    std::string_view banner_color    { ansi::magenta };
-    bool banner_bold { true };
-};
 
 void print_cards_box(const std::vector<Cuarenta::Rank>& cards,
                      bool is_empty,
@@ -152,11 +193,6 @@ void print_cards_box(const std::vector<Cuarenta::Rank>& cards,
     if (!cards.empty()) std::cout << '\n';
 }
 
-static constexpr int TABLE_CAPACITY { 11 }; // 10 (max capacity) + 1 (for intermediate captures)
-static constexpr int CARD_CELL_W    { 8 }; 
-static constexpr int TABLE_INNER_W  { TABLE_CAPACITY * CARD_CELL_W };
-static constexpr int CARD_LINES_H   { 5 };
-
 std::vector<std::string> build_cards_box_lines(
     const std::vector<Cuarenta::Rank>& cards,
     bool is_empty,
@@ -209,8 +245,8 @@ std::vector<std::string> build_cards_box_lines(
 }
 
 void print_table_framed(const std::vector<Cuarenta::Rank>& table_cards,
-                        const Render_Opts& opt)
-{
+                        const RenderOpts& opt) {
+
     static constexpr int FRAME_PAD { 1 };
 
     const size_t inner_w { TABLE_INNER_W };
@@ -296,6 +332,21 @@ void print_table_framed(const std::vector<Cuarenta::Rank>& table_cards,
     std::cout << bot << "\n";
 }
 
+Bot::Bot bot_selection_screen() {
+    clear_screen();
+    std::cout << "============================================================\n";
+    std::cout << "                    Bot Selection Screen                    \n";
+    std::cout << "============================================================\n";
+    while (true) {
+        std::string input;
+        if (!std::getline(std::cin, input)) {
+            break;
+        }
+    }
+    sleep_ms(1000);
+    return Bot::BOT_CHILD;
+}
+
 std::string describe_move_targets(const Cuarenta::Move &mv) {
 
     if (to_u16(mv.targets_mask) == 0) {
@@ -318,54 +369,12 @@ std::string describe_move_targets(const Cuarenta::Move &mv) {
     return played + " = " + combo;
 }
 
-// TODO: fix from out param to std::optional
-bool try_parse_rank_token(const std::string& token, Cuarenta::Rank& out) {
-    if (token.empty()) { return false; }
-    std::string normalized;
-    normalized.reserve(token.size());
-    for (char ch : token) {
-        if (!std::isspace(static_cast<unsigned char>(ch))) {
-            normalized += static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
-        }
-    }
-    for (int i{1}; i <= Cuarenta::NUM_RANKS; i++) {
-        Cuarenta::Rank r = Cuarenta::int_to_rank(i);
-        std::string rs = Cuarenta::rank_to_str(r);
-        std::string rs_upper;
-        for (char c : rs) {
-            rs_upper += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-        }
-        if (rs_upper == normalized) {
-            out = r;
-            return true;
-        }
-        bool numeric = !normalized.empty();
-        for (char c : normalized) {
-            if (!std::isdigit(static_cast<unsigned char>(c))) {
-                numeric = false;
-                break;
-            }
-        }
-        if (numeric) {
-            try {
-                int value = std::stoi(normalized);
-                if (value == i) {
-                    out = r;
-                    return true;
-                }
-            } catch (...) {
-            }
-        }
-    }
-    return false;
-}
-
 int find_move_by_input(const std::string& raw_input,
                        const Cuarenta::MoveList& moves)
 {
-    auto start = raw_input.find_first_not_of(" \t");
-    auto end   = raw_input.find_last_not_of(" \t");
-    if (start == std::string::npos) return -1;
+    auto start { raw_input.find_first_not_of(" \t") };
+    auto end   { raw_input.find_last_not_of(" \t") };
+    if (start == std::string::npos) { return -1; }
     std::string input = raw_input.substr(start, end - start + 1);
 
     std::string lhs;
@@ -378,10 +387,7 @@ int find_move_by_input(const std::string& raw_input,
         lhs = input;
     }
 
-    Cuarenta::Rank played;
-    if (!try_parse_rank_token(lhs, played)) {
-        return -1;
-    }
+    std::optional<Cuarenta::Rank> played { try_parse_rank_token(lhs) };
 
     // Parse targets if any
     Cuarenta::RankMask targets_mask = Cuarenta::to_mask(0);
@@ -392,9 +398,9 @@ int find_move_by_input(const std::string& raw_input,
             auto b = tok.find_first_not_of(" \t");
             auto e = tok.find_last_not_of(" \t");
             if (b == std::string::npos) { return false; }
-            Cuarenta::Rank t;
-            if (!try_parse_rank_token(tok.substr(b, e - b + 1), t)) { return false; }
-            target_ranks.push_back(t);
+            auto t { try_parse_rank_token(tok.substr(b, e - b + 1)) };
+            if (!t) { return false; }
+            target_ranks.push_back(t.value());
             return true;
         };
         for (char ch : rhs) {
@@ -458,7 +464,7 @@ void print_scoreboard(const Cuarenta::Game_State& game) {
 void print_game_state(const Cuarenta::Game_State& game,
                       const std::vector<Cuarenta::Rank>& visible_table,
                       View view = View::ByTurn,
-                      const Render_Opts& opt = {}) {
+                      const RenderOpts& opt = {}) {
     clear_screen();
     print_scoreboard(game);
     
@@ -488,7 +494,7 @@ void print_game_state(const Cuarenta::Game_State& game,
 }
 
 void flash_invalid_input(const Cuarenta::Game_State& game, View view) {
-    Render_Opts red;
+    RenderOpts red;
     red.error_flash = true;
 
     print_game_state(game, Cuarenta::mask_to_vector(game.table.cards), view, red);
@@ -535,7 +541,7 @@ void apply_move_with_animation(Cuarenta::Game_State& game,
         auto idx = first_index_of_rank(hand_cards, played);
 
         if (idx) {
-            Render_Opts opts;
+            RenderOpts opts;
             if (on_bottom) {
                 opts.bottom_hi_index = idx;
                 opts.bottom_color = ansi::yellow;
@@ -544,12 +550,13 @@ void apply_move_with_animation(Cuarenta::Game_State& game,
                 opts.top_color = ansi::yellow;
             }
             print_game_state(temp_game, Cuarenta::mask_to_vector(temp_game.table.cards), view, opts);
-            sleep_ms(950);
+            sleep_ms(700);
         }
 
+        auto played_rank { mv.get_played_rank() };
+
         {
-            Render_Opts opts;
-            auto played_rank { mv.get_played_rank() };
+            RenderOpts opts;
 
             auto visible_table { Cuarenta::mask_to_vector(temp_game.table.cards) };
             auto it { std::ranges::lower_bound(visible_table, played_rank) };
@@ -563,7 +570,50 @@ void apply_move_with_animation(Cuarenta::Game_State& game,
             Cuarenta::remove_card_from_hand(Cuarenta::current_player_state(temp_game).hand, played_rank);
 
             print_game_state(temp_game, visible_table, view, opts);
-            sleep_ms(950);
+            sleep_ms(700);
+            
+            const bool is_addition { !std::has_single_bit(to_u16(mv.targets_mask)) };
+            const bool is_capture  { is_addition || Cuarenta::contains_ranks(game.table.cards, to_mask(played_rank)) };
+
+            // Caida matching
+            if (is_capture && !is_addition) {
+                for (size_t i{}; i < visible_table.size(); i++) {
+                    if (visible_table[i] == played_rank) {
+                        opts.table_idx_to_highlight.push_back(i);
+                    }
+                }
+            }
+            // Addition matching
+            else {
+                const auto addition_mask { mv.targets_mask & ~Cuarenta::to_mask(played_rank) };
+                const auto vec { Cuarenta::mask_to_vector(addition_mask) };
+                for (size_t i{}; i < visible_table.size(); i++) {
+                    if (std::ranges::find(vec, visible_table[i]) != vec.end()) {
+                        opts.table_idx_to_highlight.push_back(i);
+                    }
+                }
+            }
+
+            print_game_state(temp_game, visible_table, view, opts);
+            sleep_ms(500);
+
+            // Waterfall matching
+            if (is_capture) {
+                int num_waterfalled{};
+                while (played_rank != Cuarenta::Rank::King) {
+                    played_rank++;
+                    if (contains_ranks(game.table.cards, to_mask(played_rank))) { 
+                        auto it { std::ranges::find(visible_table, played_rank) };
+                        opts.table_idx_to_highlight.push_back(
+                            static_cast<size_t>(std::distance(visible_table.begin(), it)));
+                            
+                        opts.table_color = ansi::waterfall(static_cast<size_t>(++num_waterfalled));
+                        print_game_state(temp_game, visible_table, view, opts);
+                        sleep_ms(500 - 35 * num_waterfalled);
+                    }
+                    else { break; }
+                }
+            }
         }
 
     }
@@ -571,18 +621,19 @@ void apply_move_with_animation(Cuarenta::Game_State& game,
     print_game_state(game, Cuarenta::mask_to_vector(game.table.cards), view);
 }
 
-} // namespace
-
 void show_banner() {
-    std::cout << "========================================\n";
-    std::cout << "        Welcome to CUARENTA CLI         \n";
-    std::cout << "========================================\n";
+    std::cout << "============================================================\n";
+    std::cout << "                  Welcome to CUARENTA CLI                   \n";
+    std::cout << "============================================================\n";
     std::cout << "Cuarenta is a traditional fishing card game from Ecuador.\n";
     std::cout << "Reach 40 points before your opponent to win.\n";
     std::cout << "Type 'help' to see available commands.\n\n";
 }
 
 void show_help() {
+    std::cout << "============================================================\n";
+    std::cout << "                  Welcome to the Help Menu                  \n";
+    std::cout << "============================================================\n";
     std::cout << "\nAvailable commands:\n";
     std::cout << "  play human   : start a two–player (human vs human) game\n";
     std::cout << "  play bot     : start a game against the computer\n";
@@ -604,9 +655,15 @@ size_t choose_move_ai(Cuarenta::Game_State& game, int depth) {
     return best_idx;
 }
 
-void run_game(bool versus_bot)
+void run_game(std::optional<Bot::Bot> bot)
 {
-    Cuarenta::Game_State game;
+    Cuarenta::Game_State game{};
+
+    bool versus_bot{};
+    if (bot) { versus_bot = true; }
+    else     { versus_bot = false; }
+    
+
     std::cout << "Starting a new "
               << (versus_bot ? "human vs computer" : "human vs human")
               << " game...\n";
@@ -661,6 +718,7 @@ void run_game(bool versus_bot)
                 }
 
                 if (input == "help") {
+                    clear_screen();
                     show_help();
                     std::cout << "\nAvailable moves:\n";
                     for (size_t i{}; i < moves.size; i++) {
@@ -721,6 +779,7 @@ void run_game(bool versus_bot)
 
 int run_cli() {
     try {
+        clear_screen();
         show_banner();
         while (true) {
             std::cout << "> ";
@@ -733,12 +792,17 @@ int run_cli() {
             cmd = cmd.substr(b, e - b + 1);
 
             if (cmd == "help") {
+                clear_screen();
                 show_help();
             } else if (cmd == "play human") {
                 run_game(false);
                 std::cout << "\nGame finished. Back to main menu.\n";
+                sleep_ms(1500);
+                clear_screen();
+                show_banner();
             } else if (cmd == "play bot") {
-                run_game(true);
+                Bot::Bot bot { bot_selection_screen() };
+                run_game(bot);
                 std::cout << "\nGame finished. Back to main menu.\n";
             } else if (cmd == "quit" || cmd == "exit") {
                 std::cout << "Goodbye!\n";
@@ -753,3 +817,5 @@ int run_cli() {
     }
     return 0;
 }
+
+} // namespace cli
