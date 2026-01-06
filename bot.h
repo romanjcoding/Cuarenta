@@ -2,6 +2,7 @@
 #include "cuarenta.h"
 #include "game_state.h"
 #include "rank.h"
+#include "ansi.h"
 #include <vector>
 #include <array>
 #include <utility>
@@ -13,7 +14,7 @@ enum class BotType : uint8_t { CHILD, ROBOT, OLDMAN, CHEAT };
 
 struct Move_Eval {
     Cuarenta::Move move;
-    double value; // negamax value from the current player's perspective
+    double eval; // negamax value from the current player's perspective
     double std_dev;
 };
 
@@ -32,13 +33,11 @@ constexpr size_t rank_to_idx(Cuarenta::Rank rank) {
 }
 
 struct Bot {
-    BotType bot_type_;
     Hand_Probability hand_probabilities_;
     int num_mc_iters_;
 
-    Bot(BotType bot_type, int num_mc_iters) : 
-        bot_type_{bot_type},
-        hand_probabilities_{ std::array<double, Cuarenta::NUM_CARDS>{
+    constexpr Bot(int num_mc_iters) : 
+        hand_probabilities_{ std::array<double, Cuarenta::NUM_CARDS> {
             1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
             1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
             1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
@@ -62,6 +61,11 @@ struct Bot {
         }
     }
 };
+
+static constexpr Bot BOT_CHILD { Bot{1} };
+static constexpr Bot BOT_ROBOT { Bot{10} };
+static constexpr Bot BOT_CHEAT { Bot{10000} };
+
 
 constexpr double heuristic_value(const Cuarenta::Game_State& game);
 constexpr int deterministic_value(const Cuarenta::Game_State& game);

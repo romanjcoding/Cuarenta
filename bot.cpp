@@ -103,7 +103,8 @@ std::vector<Move_Eval> evaluate_all_moves_mc (
 
     int NUM_ITER { bot.num_mc_iters_ };
 
-    for (int _{}; _< NUM_ITER; _++) {
+    for (int unused{}; unused< NUM_ITER; unused++) {
+        static_cast<void>(unused);
 
         for (auto& rank : Cuarenta::opposing_player_state(game_state).hand.cards) {
             rank = idx_to_rank(monte_carlo_idx(bot.hand_probabilities_));
@@ -133,7 +134,7 @@ std::vector<Move_Eval> evaluate_all_moves_mc (
         const double var  { S2[i] / NUM_ITER - mean * mean };
         move_evaluations.emplace_back(Move_Eval{ 
             .move = available_moves.moves[i],
-            .value = mean,
+            .eval = mean,
             .std_dev = std::sqrt(var) // clamp to std::max(0.0, std::sqrt(var))?
         });
     }
