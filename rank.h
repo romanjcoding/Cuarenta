@@ -152,6 +152,18 @@ constexpr Rank operator++(Rank& rank, int) {
     return old;
 }
 
+constexpr Rank operator--(Rank& rank, int) {
+    assert(rank != Rank::Ace);
+    Rank old = rank;
+    rank = to_rank(static_cast<uint16_t>(to_u16(rank) >> 1));
+    return old;
+}
+
+constexpr Rank prev_rank(Rank rank) {
+    assert(rank != Rank::Ace);
+    return to_rank(static_cast<uint16_t>(to_u16(rank) >> 1));
+}
+
 constexpr bool operator<(Rank a, Rank b) {
     return rank_to_int(a) < rank_to_int(b);
 }
