@@ -4,6 +4,7 @@
 #include "dynamic_array.h"
 #include "cuarenta.h"
 #include "movegen.h"
+#include "rank.h"
 
 #include <limits>
 #include <algorithm>
@@ -40,26 +41,22 @@ constexpr int deterministic_value(const Cuarenta::Game_State& game_state) {
     return player.score - enemy.score + captured_cards_score;
 }
 
-std::pair<Cuarenta::Rank, size_t> monte_carlo_idx(std::map<Cuarenta::Rank, util::dynamic_array<double, 4>> hand_prob) {
+Cuarenta::Rank monte_carlo_gen(std::map<Cuarenta::Rank, RankProbability> hand_prob) {
 
     static std::random_device rd;
     static std::mt19937 gen(rd());
 
     double tot_sum{};
-    for (auto pair : hand_prob) {
-        for (size_t i{}; i < pair.second.size(); i++) {
-            tot_sum += pair.second.at(i);
-            pair.second.at(i) = tot_sum;
-        }
+    for (const auto& [rank, rank_prob] : hand_prob) {
+        tot_sum += rank_prob.count * rank_prob.probability_weight;
     }
 
     std::uniform_real_distribution<double> dis(0, tot_sum);
     double rand { dis(gen) };
 
-    for (const auto pair : hand_prob) {
-        for (size_t idx{}; idx < pair.second.size(); idx++) {
-            if (rand >= pair.second.at(idx)) { return std::pair{pair.first, idx}; }
-        }
+    for (const auto& [rank, rank_prob] : hand_prob) {
+        rand -= rank_prob.count * rank_prob.probability_weight;
+        if (rand <= 0) { return rank; }
     }
     throw std::out_of_range("Error with monte-carlo RNG generation");
 }
@@ -74,9 +71,7 @@ double minimax(Cuarenta::Game_State& game_state, const int depth) {
         return static_cast<double>(deterministic_value(game_state));
     }
 
-    if (depth == 0) { 
-        return heuristic_value(game_state); 
-    }
+    if (depth == 0) { return heuristic_value(game_state); }
 
     const auto available_moves { Cuarenta::generate_all_moves(game_state) };
 
@@ -94,7 +89,7 @@ double minimax(Cuarenta::Game_State& game_state, const int depth) {
     return value;
 }
 
-std::vector<Move_Eval> evaluate_all_moves_mc (
+std::vector<MoveEval> evaluate_all_moves_mc (
     const Bot& bot,
     Cuarenta::Game_State& game_state, 
     const int depth) {
@@ -116,7 +111,7 @@ std::vector<Move_Eval> evaluate_all_moves_mc (
         static_cast<void>(unused);
 
         for (auto& rank : Cuarenta::opposing_player_state(game_state).hand.cards) {
-            rank = monte_carlo_idx(bot.hand_prob).first;
+            rank = monte_carlo_gen(bot.hand_prob);
         }
 
         for (size_t i{}; i < available_moves.size(); i++) {
@@ -135,13 +130,13 @@ std::vector<Move_Eval> evaluate_all_moves_mc (
         Cuarenta::opposing_player_state(game_state).hand.cards = opp_hand_copy;
     }
 
-    std::vector<Move_Eval> move_evaluations;
+    std::vector<MoveEval> move_evaluations;
     move_evaluations.reserve(available_moves.size());
 
     for (size_t i{}; i < available_moves.size(); i++) {
         const double mean { S1[i] / NUM_ITER };
         const double var  { S2[i] / NUM_ITER - mean * mean };
-        move_evaluations.emplace_back(Move_Eval{ 
+        move_evaluations.emplace_back(MoveEval{ 
             .move = Cuarenta::Move{available_moves.at(i)},
             .eval = mean,
             .std_dev = std::sqrt(var) // clamp to std::max(0.0, std::sqrt(var))?
