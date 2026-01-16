@@ -22,6 +22,12 @@ An important consideration is that the negamax search terminates in an imperfect
 <img width="1200" height="800" alt="heuristics" src="https://github.com/user-attachments/assets/99bce393-e5f1-458e-a353-22227ab5fd08" />
 </p>
 
+We notice there is a constant portion and a nearly linear portion, so we approximate the data with a smooth extension of an ReLu, the softplus function. In addition, we shift and scale the function, fitting to $f(x) = b + a\log(1 + e^{k(x - h)})$.
+
+<p align = "center">
+<img width="1200" height="800" alt="heuristics_with_fits" src="https://github.com/user-attachments/assets/68b3ce63-894b-4cb1-bfa5-2ac4d0c8796b" />
+</p>
+
 
 ### Strategy Fusion
 One of the primary issues with PIMC is strategy fusion. Consider the simple example of a modified game of Rock, Paper, Scissors.
