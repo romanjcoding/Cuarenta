@@ -14,20 +14,42 @@
 #include <iomanip>
 #include <iterator>
 #include <stdexcept>
+#include <cmath>
+#include <string>
 
 namespace Bot {
 
-constexpr double heuristic_value(const Cuarenta::Game_State& game_state) {
-    return Cuarenta::current_player_state(game_state).score  - 
-           Cuarenta::opposing_player_state(game_state).score;
+constexpr double round_heuristic(const int round, const int num_captured_cards, const Cuarenta::Player player) {
+    if (round == 4) { return 0.0; }
+    if (player == Cuarenta::Player::P1) {
+        switch (round) {
+            case 1:
+                return 0.7642 * num_captured_cards + 3.1222;
+            case 2:
+                return 1.5204 + 3.0024 * std::log(1 + std::exp(0.5966 * (static_cast<double>(num_captured_cards) - 6.3061)));
+            case 3:
+                return 0.6263 + 0.4079 * std::log(1 + std::exp(1.6525 * (static_cast<double>(num_captured_cards) - 11.5297)));
+        }
+    }
+    if (player == Cuarenta::Player::P2) {
+        switch (round) {
+            case 1:
+                return 0.7529 * num_captured_cards + 7.0585;
+            case 2:
+                return 3.9710 + 0.5644 * std::log(1 + std::exp(1.1499 * (static_cast<double>(num_captured_cards) - 3.2285)));
+            case 3:
+                return 2.0381 + 0.2713 * std::log(1 + std::exp(1.8338 * (static_cast<double>(num_captured_cards) - 9.1723)));
+        }
+    }
+    throw std::invalid_argument("If I wake up to this I will be sad :(" + std::to_string(round));
 }
 
-constexpr int deterministic_value(const Cuarenta::Game_State& game_state) {
+constexpr double heuristic_value(const Cuarenta::Game_State& game_state) {
 
     int captured_cards_score { 0 };
 
-    auto player { Cuarenta::current_player_state(game_state) };
-    auto enemy  { Cuarenta::opposing_player_state(game_state) };
+    const auto& player { Cuarenta::current_player_state(game_state) };
+    const auto& enemy  { Cuarenta::opposing_player_state(game_state) };
 
     // Scoring rules: 20 cards = 6pts, 22 cards = 8pts, etc.
     if (player.num_captured_cards >= 20) {
@@ -37,28 +59,15 @@ constexpr int deterministic_value(const Cuarenta::Game_State& game_state) {
     if (enemy.num_captured_cards >= 20) {
             captured_cards_score -= 6 + 2 * ((enemy.num_captured_cards - 20) / 2);
     }
+    
+    auto curr_player { (game_state.to_move == Cuarenta::Player::P1) ? Cuarenta::Player::P1 : Cuarenta::Player::P2 };
+    const int round { deck_size_to_round(game_state.deck.cards.size()) };
+    const double heuristic_score { 
+        round_heuristic(round, player.num_captured_cards, curr_player) -
+        round_heuristic(round, enemy.num_captured_cards, curr_player)
+    };
 
-    return player.score - enemy.score + captured_cards_score;
-}
-
-Cuarenta::Rank monte_carlo_gen(std::map<Cuarenta::Rank, RankProbability> hand_prob) {
-
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-
-    double tot_sum{};
-    for (const auto& [rank, rank_prob] : hand_prob) {
-        tot_sum += rank_prob.count * rank_prob.probability_weight;
-    }
-
-    std::uniform_real_distribution<double> dis(0, tot_sum);
-    double rand { dis(gen) };
-
-    for (const auto& [rank, rank_prob] : hand_prob) {
-        rand -= rank_prob.count * rank_prob.probability_weight;
-        if (rand <= 0) { return rank; }
-    }
-    throw std::out_of_range("Error with monte-carlo RNG generation");
+    return player.score - enemy.score + captured_cards_score + heuristic_score;
 }
 
 double minimax(Cuarenta::Game_State& game_state, const int depth) {
@@ -68,7 +77,7 @@ double minimax(Cuarenta::Game_State& game_state, const int depth) {
     }
 
     if (Cuarenta::current_player_state(game_state).hand.cards.empty()) {
-        return static_cast<double>(deterministic_value(game_state));
+        return heuristic_value(game_state);
     }
 
     if (depth == 0) { return heuristic_value(game_state); }
@@ -107,11 +116,10 @@ std::vector<MoveEval> evaluate_all_moves_mc (
 
     int NUM_ITER { bot.num_mc_iters_ };
 
-    for (int unused{}; unused< NUM_ITER; unused++) {
-        static_cast<void>(unused);
+    for (int unused{}; unused < NUM_ITER; unused++) {
 
         for (auto& rank : Cuarenta::opposing_player_state(game_state).hand.cards) {
-            rank = monte_carlo_gen(bot.hand_prob);
+            rank = bot.weighted_random_rank();
         }
 
         for (size_t i{}; i < available_moves.size(); i++) {

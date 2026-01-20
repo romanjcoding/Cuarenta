@@ -1,12 +1,12 @@
 #pragma once
+
 #include "rank.h"
+#include "cuarenta.h"
 
 #include <vector>
 #include <iostream>
 #include <random>
 #include <algorithm>
-
-#include "cuarenta.h"
 
 namespace Cuarenta {
 
@@ -17,7 +17,7 @@ struct Card {
 
 struct Hand {
    std::vector<Rank> cards;
-   void print_hand() { 
+    void print_hand() const { 
         std::cout << "Hand: ";
         for (const Rank& rank : cards) {
             std::cout << rank_to_str(rank);
@@ -37,7 +37,7 @@ struct Deck {
             Rank::Jack, Rank::Queen, Rank::King
         };
         for (Rank r : ranks) {
-            for (int i=0; i<4; i++) {
+            for (int i{}; i < 4; i++) {
                 cards.push_back(r);
             }
         }
@@ -65,24 +65,31 @@ struct Deck {
 struct Move {
     RankMask targets_mask{};
     Rank get_played_rank() const {
-        const int largest_bit  { NUM_RANK_BITS - std::countl_zero(to_u16(targets_mask)) };
+        const int largest_bit  { static_cast<int>(NUM_RANK_BITS) - std::countl_zero(to_u16(targets_mask)) };
         return int_to_rank(largest_bit);
     }
 };
 
 struct Table {
 
-    RankMask cards;
+    RankMask cards{};
     Rank last_played_card{ Rank::Invalid };
 
-    void print_table() {
-        std::cout << "TABLE: ";
-        for (Rank rank = Rank::Ace; rank != Rank::Invalid; rank++) {
+    void print_table() const {
+        std::cout << "Table: ";
+        for (Rank rank = Rank::Ace; rank != Rank::King; rank++) {
             if (contains_ranks(cards, to_mask(rank))) {
                 std::cout << rank_to_str(rank);
             }
         }
+        if (contains_ranks(cards, to_mask(Rank::King))) {
+            std::cout << rank_to_str(Rank::King);
+        }
         std::cout << '\n';
+    }
+    void reset() {
+        cards = to_mask(0);
+        last_played_card = Rank::Invalid;
     }
 };
 
@@ -105,15 +112,29 @@ struct Game_State {
     }};
     Player to_move { Player::P1 };
 
-    Game_State() {}
-
-    Game_State(const Hand& hand1, const Hand& hand2) 
+    Game_State() 
         : table{},
+          deck{true},
           players{{
-              Player_State{ hand1, 0, 0 },
-              Player_State{ hand2, 0, 0 }
-          }},
-          to_move{ Player::P1 } {}
+            Player_State{ .hand = deck.draw_hand(),
+                          .num_captured_cards = 0,
+                          .score = 0 },
+            Player_State{ .hand = deck.draw_hand(),
+                          .num_captured_cards = 0,
+                          .score = 0 } }},
+        to_move{ Player::P1 } {}
+
+    Game_State(Hand handp1, Hand handp2)
+        : table{},
+          deck{true},
+          players{{
+            Player_State{ .hand = handp1,
+                          .num_captured_cards = 0,
+                          .score = 0 },
+            Player_State{ .hand = handp2,
+                          .num_captured_cards = 0,
+                          .score = 0 } }},
+        to_move{ Player::P1 } {}
 
     void advance_turn() {
         switch (to_move) {
@@ -165,4 +186,4 @@ constexpr const Player_State& opposing_player_state(const Game_State& g) {
     return g.players[1 - to_index(g.to_move)];
 }
 
-}
+} // namespace Cuarenta

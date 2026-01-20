@@ -22,8 +22,11 @@ enum class View {
 enum class State {
     Menu,
     MenuHelp,
-    Game,
-    GameHelp,
+    BotSelect,
+    PlayingHuman,
+    PlayingBot,
+    PlayingHelp,
+    Quit
 };
 
 int run_cli();

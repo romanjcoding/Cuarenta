@@ -164,8 +164,12 @@ constexpr Rank prev_rank(Rank rank) {
     return to_rank(static_cast<uint16_t>(to_u16(rank) >> 1));
 }
 
-constexpr bool operator<(Rank a, Rank b) {
+constexpr bool operator <(Rank a, Rank b) {
     return rank_to_int(a) < rank_to_int(b);
+}
+
+constexpr bool operator >(Rank a, Rank b) {
+    return rank_to_int(a) > rank_to_int(b);
 }
 
 } // namespace Rank

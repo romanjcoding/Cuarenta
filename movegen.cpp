@@ -35,4 +35,4 @@ util::dynamic_array<RankMask, MAX_MOVES_PER_TABLE> generate_all_moves(const Game
     return available_moves;
 }
 
-}
+} // namespace Cuarenta

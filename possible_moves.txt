@@ -1,6 +1,6 @@
 XXXXXX KQJ 7654321
 
-Simple single-card-placements + captures
+Simple single-card-placements + captures:
 000000 000 0000001
 000000 000 0000010
 000000 000 0000100
@@ -12,17 +12,87 @@ Simple single-card-placements + captures
 000000 010 0000000
 000000 100 0000000
 
-Additions
+Additions:
 000000 000 0000111  A+2   = 3
 000000 000 0001101  A+3   = 4
 000000 000 0011001  A+4   = 5
 000000 000 0010110  2+3   = 5
 000000 000 0110001  A+5   = 6
 000000 000 0101010  4+2   = 6
-000000 000 0000000  A+2+3 = 6
+000000 000 0100111  A+2+3 = 6
 000000 000 1100001  A+6   = 7
 000000 000 1010010  2+5   = 7
-000000 000 0000000  3+4   = 7
+000000 000 1001100  3+4   = 7
 000000 000 1001011  A+2+4 = 7
 
 Total, 21 checks.
+
+ADDITIONS_BY_RANK<RankMask> = 
+{{},                     
+ {},                     
+ {000000 000 0000011},
+ {000000 000 0000101},
+ {000000 000 0001001, 000000 000 0000110},
+ {000000 000 0010001, 000000 000 0001010, 000000 000 0000111},
+ {000000 000 0100001, 000000 000 0010010, 000000 000 0001100, 000000 000 0001011},
+ {},
+ {},
+ {},
+}
+
+LOW_MASK = 
+000000 000 0111111
+
+low_table = table.cards & LOW_MASK
+
+// pattern is usable, i.e. is a subset of low_present (table bits)
+if ((pattern & low_table) == pattern) {
+    moves.push_back(pattern)
+}
+
+
+GENERATE_ALL_MOVES()
+
+1. For each card, push_back all "Simple single-card-placements + captures"
+2. For the table, we care about the cards A123456, because they are the only ones
+   which contribute to addition. So, there are 2^7 = 128 table-states after masking.
+
+
+
+2^10 = 1024 possible board states
+For each card (of 5), there are
+
+
+
+
+New Thoughts:
+
+The game is solvable up to the heuristic of guessing what 
+    f(num_cards_captured) = [points] is.
+
+Would the bot gain any benefit to iterating past a full hand? If we iterate thru
+the entire deck, the benefit would be that we would not require this heuristic.
+However, this would be very resource intensive. Atm, depth = 10 (full hand) will
+iterate 5*5*4*4*3*3*2*2*1*1 = (5!)^2 = 14400 positions. If, for each hand, we 
+generate new hands, this would be ((5!)^2)^n for n hands. A full game would be 4
+hands, so ((5!)^2)^4 ~ 4.3 * 10^16.
+
+However, we might be able to calculate the heuristic on our own through training?
+i.e., assume at the beginning f(.) = 0. Then, at the end of a game save the values
+and update the heuristic. We have to choose an underlying function to update
+paramaters though, so will need to plot and determine. Moreover, there should be
+4 different functions depending on which hand-redraw we are in.
+
+If we do the above (heuristic), then the computation for determining the 
+evaluation of a hand is very quick. Thus, a focus on parallelizing 
+the monte-carlo generation for many iterations could be very useful.
+
+Also, we need to add alpha-beta pruning.
+
+
+
+do 40 bits for ea. card,
+for 5 card 
+
+idea: use upper bit of Move to signifiy addition
+      

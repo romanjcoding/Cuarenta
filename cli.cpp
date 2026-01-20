@@ -300,8 +300,6 @@ void run_game(std::optional<Bot::Bot> bot) {
 
 int run_cli() {
     try {
-        clear_screen();
-        print_menu_banner();
         while (true) {
 
             auto input { read_input() };
@@ -309,6 +307,7 @@ int run_cli() {
             if (input.help) {
                 clear_screen();
                 print_help_banner();
+
             }
 
             else if (input.play_human) {
@@ -334,7 +333,7 @@ int run_cli() {
                 std::cout << "Unknown command. Type 'help' for a list of commands.\n";
             }
         }
-    } catch (const std::exception &ex) {
+    } catch (const std::exception& ex) {
         std::cerr << "Error: " << ex.what() << "\n";
         return 1;
     }

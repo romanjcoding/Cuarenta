@@ -38,4 +38,4 @@ constexpr RankMask LOW_MASK { to_mask(Rank::Ace)   | to_mask(Rank::Two)  |
 
 util::dynamic_array<RankMask, MAX_MOVES_PER_TABLE> generate_all_moves(const Game_State& game);
 
-}
+} // namespace Cuarenta

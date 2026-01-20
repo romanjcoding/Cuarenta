@@ -9,10 +9,6 @@
 
 namespace Cuarenta {
 
-bool is_valid_move(const Move& move, const Table& table) {
-    return true;
-}
-
 void remove_ranks(RankMask& cards, const RankMask to_remove) {
     cards = cards & ~(cards & to_remove);
 }
@@ -51,71 +47,8 @@ void update_captured_cards(Game_State& game) {
         if (player_state.num_captured_cards >= 20) {
             player_state.score += 6 + 2 * ((player_state.num_captured_cards - 20) / 2);
         }
+        player_state.num_captured_cards = 0;
     }
-}
-
-Game_State make_move(Game_State game, const Move& move) {
-
-    Player_State& player_state { current_player_state(game) };
-    Table& table               { game.table };
-    
-    const RankMask targets_mask  { move.targets_mask };
-    const bool is_addition       { !std::has_single_bit(to_u16(targets_mask)) };
-    const Rank played_card       { move.get_played_rank() };
-
-    const RankMask addition_mask { move.targets_mask & ~to_mask(played_card) };
-    const bool table_has_capture { (is_addition)   ? 
-        contains_ranks(table.cards, addition_mask) :
-        contains_ranks(table.cards, to_mask(played_card)) };
-
-    if (!is_card_in_hand(player_state.hand, played_card)) {
-        player_state.hand.print_hand();
-        throw std::invalid_argument(
-            "Invalid RankMask used, played card (MSB in RankMask) is not in current players hand.\n"
-        );
-    }
-
-    if (is_addition) {
-        if (!table_has_capture) {
-            throw std::invalid_argument(
-            "Invalid RankMask used, cards are not on the table.\n"
-            ); 
-        }
-        else {
-            const int num_waterfalled_cards { 
-                sequence_waterfall(table.cards, played_card) };
-            player_state.num_captured_cards += 
-                std::popcount(to_u16(targets_mask)) + num_waterfalled_cards;
-            remove_ranks(table.cards, targets_mask & ~to_mask(played_card));
-            table.last_played_card = Rank::Invalid;
-        }
-    }
-
-    else {
-        if (!table_has_capture) {
-            table.last_played_card = played_card;
-            add_ranks(table.cards, targets_mask);
-        }
-        else {
-            // Caída: +2 points
-            if (played_card == table.last_played_card) {
-                player_state.score += 2;
-            }
-            const int num_waterfalled_cards { 
-                sequence_waterfall(table.cards, played_card) };
-            player_state.num_captured_cards += 2 + num_waterfalled_cards;
-            remove_ranks(table.cards, to_mask(played_card));
-            table.last_played_card = Rank::Invalid;
-        }
-    }
-
-    // Limpia: +2 points
-    if (to_u16(table.cards) == 0) {
-        player_state.score += 2;
-    }
-
-    remove_card_from_hand(player_state.hand, played_card);
-    return game;
 }
 
 Undo make_move_in_place(Game_State& game, const Move& move) {
@@ -233,54 +166,4 @@ void undo_move_in_place(Game_State& game, const Undo& undo) {
     }
 }
 
-void print_move(const Game_State& game, const Move& move) {
-
-    // Who's playing?
-    const Player current_player  { game.to_move };
-    const std::size_t player_idx { to_index(current_player) };
-    const Player_State& pstate   { game.players[player_idx] };
-
-    // Played card + targets
-    const int largest_bit  { NUM_RANK_BITS - std::countl_zero(to_u16(move.targets_mask)) };
-    const Rank played_card { int_to_rank(largest_bit) };
-    const auto played_bits { std::bitset<16>(to_u16(played_card)) };
-    const auto target_bits { std::bitset<16>(to_u16(move.targets_mask)) };
-
-    const bool is_single_capture { std::has_single_bit(to_u16(move.targets_mask)) };
-    const bool targets_exist     { contains_ranks(game.table.cards, move.targets_mask) };
-
-    std::cout << "========================= MOVE =========================\n";
-
-    // Player info
-    std::cout << "Player: "
-              << (current_player == Player::P1 ? "P1" : "P2")
-              << " | score: "          << pstate.score 
-              << " | captured: "       << pstate.num_captured_cards
-              << " | hand size: "      << pstate.hand.cards.size()
-              << '\n';
-
-    // Table state before the move
-    std::cout << "Table cards (bitset): "
-              << std::bitset<16>(to_u16(game.table.cards))
-              << '\n';
-
-    // Played card + targets
-    std::cout << "Playing card: "      << rank_to_str(played_card)
-              << " =     " << played_bits << "\n";
-
-    std::cout << "Targets mask:         "      << target_bits
-              << " -> "                << (is_single_capture ? "single capture"
-                                                             : "multi-capture/addition")
-              << '\n';
-
-    std::cout << "Targets "            << (targets_exist ? "do" : "do not")
-              << " exist on the table.\n";
-
-    std::cout << "Playing will yield " 
-    << current_player_state(make_move(game, move)).score - pstate.score 
-    << " points.\n";
-
-    std::cout << "========================================================\n";
-}
-
-}
+} // namespace Cuarenta

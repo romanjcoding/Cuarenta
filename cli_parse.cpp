@@ -51,6 +51,7 @@ std::optional<Cuarenta::Rank> try_parse_rank_token(const std::string& token) {
 
 InputData read_input() {
 
+    std::cout << "> ";
     std::string input;
     if (!std::getline(std::cin, input)) {
         return InputData { .err = true };
