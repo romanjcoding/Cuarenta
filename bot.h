@@ -87,19 +87,7 @@ constexpr double heuristic_value(const Cuarenta::Game_State& game, int round);
 
 double minimax(Cuarenta::Game_State& game, const int depth);
 
-std::vector<MoveEval> evaluate_all_moves_mc(
-    const Bot& bot,
-    Cuarenta::Game_State& game, 
-    const int depth);
-
-constexpr int deck_size_to_round(size_t deck_size) {
-    switch (deck_size) {
-        case 30uz: return 1;
-        case 20uz: return 2;
-        case 10uz: return 3;
-        case 0uz:  return 4;
-    }
-    throw std::runtime_error("Error with deck_size bro");
-}
-
+Cuarenta::Move choose_best_move(const Bot& bot, Cuarenta::Game_State game, const int depth);
+std::vector<MoveEval> evaluate_all_moves(const Bot& bot, Cuarenta::Game_State game, const int depth);
+std::pair<MoveEval, bool> determine_if_confident (const Bot& bot, Cuarenta::Game_State& game, const int depth);
 }

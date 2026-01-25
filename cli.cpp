@@ -171,7 +171,7 @@ Bot::Bot bot_selection_screen() {
 }
 
 size_t choose_move_ai(Cuarenta::Game_State& game, Bot::Bot bot, int depth) {
-    auto evals = Bot::evaluate_all_moves_mc(bot, game, depth);
+    auto evals = Bot::evaluate_all_moves(bot, game, depth);
     if (evals.empty()) { return 0; }
     size_t best_idx{};
     double best_val = evals.front().eval;

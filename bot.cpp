@@ -16,33 +16,10 @@
 #include <stdexcept>
 #include <cmath>
 #include <string>
+#include <cassert>
+#include <map>
 
 namespace Bot {
-
-constexpr double round_heuristic(const int round, const int num_captured_cards, const Cuarenta::Player player) {
-    if (round == 4) { return 0.0; }
-    if (player == Cuarenta::Player::P1) {
-        switch (round) {
-            case 1:
-                return 0.7642 * num_captured_cards + 3.1222;
-            case 2:
-                return 1.5204 + 3.0024 * std::log(1 + std::exp(0.5966 * (static_cast<double>(num_captured_cards) - 6.3061)));
-            case 3:
-                return 0.6263 + 0.4079 * std::log(1 + std::exp(1.6525 * (static_cast<double>(num_captured_cards) - 11.5297)));
-        }
-    }
-    if (player == Cuarenta::Player::P2) {
-        switch (round) {
-            case 1:
-                return 0.7529 * num_captured_cards + 7.0585;
-            case 2:
-                return 3.9710 + 0.5644 * std::log(1 + std::exp(1.1499 * (static_cast<double>(num_captured_cards) - 3.2285)));
-            case 3:
-                return 2.0381 + 0.2713 * std::log(1 + std::exp(1.8338 * (static_cast<double>(num_captured_cards) - 9.1723)));
-        }
-    }
-    throw std::invalid_argument("If I wake up to this I will be sad :(" + std::to_string(round));
-}
 
 constexpr double heuristic_value(const Cuarenta::Game_State& game_state) {
 
@@ -60,14 +37,7 @@ constexpr double heuristic_value(const Cuarenta::Game_State& game_state) {
             captured_cards_score -= 6 + 2 * ((enemy.num_captured_cards - 20) / 2);
     }
     
-    auto curr_player { (game_state.to_move == Cuarenta::Player::P1) ? Cuarenta::Player::P1 : Cuarenta::Player::P2 };
-    const int round { deck_size_to_round(game_state.deck.cards.size()) };
-    const double heuristic_score { 
-        round_heuristic(round, player.num_captured_cards, curr_player) -
-        round_heuristic(round, enemy.num_captured_cards, curr_player)
-    };
-
-    return player.score - enemy.score + captured_cards_score + heuristic_score;
+    return player.score - enemy.score + captured_cards_score;
 }
 
 double minimax(Cuarenta::Game_State& game_state, const int depth) {
@@ -98,47 +68,49 @@ double minimax(Cuarenta::Game_State& game_state, const int depth) {
     return value;
 }
 
-std::vector<MoveEval> evaluate_all_moves_mc (
+// not exposed in header
+std::pair<MoveEval, std::vector<MoveEval>> get_evaluation_data (
     const Bot& bot,
-    Cuarenta::Game_State& game_state, 
+    Cuarenta::Game_State& game, 
     const int depth) {
 
-    const auto available_moves { Cuarenta::generate_all_moves(game_state) };
+    const auto available_moves { Cuarenta::generate_all_moves(game) };
 
     if (available_moves.empty()) {
         std::cout << "No available moves to evaluate.\n";
-        return {}; 
+        return {};
     }
     std::vector<double> S1(available_moves.size());
     std::vector<double> S2(available_moves.size());
 
-    const auto opp_hand_copy { Cuarenta::opposing_player_state(game_state).hand.cards };
+    const auto opp_hand_copy { Cuarenta::opposing_player_state(game).hand.cards };
 
     int NUM_ITER { bot.num_mc_iters_ };
 
     for (int unused{}; unused < NUM_ITER; unused++) {
 
-        for (auto& rank : Cuarenta::opposing_player_state(game_state).hand.cards) {
+        for (auto& rank : Cuarenta::opposing_player_state(game).hand.cards) {
             rank = bot.weighted_random_rank();
         }
 
         for (size_t i{}; i < available_moves.size(); i++) {
 
-            const Cuarenta::Undo undo { Cuarenta::make_move_in_place(game_state, Cuarenta::Move{available_moves.at(i)}) };
-
-            game_state.advance_turn();
-            double value = -minimax(game_state, depth - 1);
-            game_state.unadvance_turn();
-
-            Cuarenta::undo_move_in_place(game_state, undo);
+            const Cuarenta::Undo undo { Cuarenta::make_move_in_place(game, Cuarenta::Move{available_moves.at(i)}) };
+            game.advance_turn();
+            double value = -minimax(game, depth - 1);
+            game.unadvance_turn();
+            Cuarenta::undo_move_in_place(game, undo);
             
             S1[i] += value;
             S2[i] += value * value;
         }
-        Cuarenta::opposing_player_state(game_state).hand.cards = opp_hand_copy;
+        Cuarenta::opposing_player_state(game).hand.cards = opp_hand_copy;
     }
 
     std::vector<MoveEval> move_evaluations;
+    MoveEval best_move { .eval = std::numeric_limits<double>::lowest(), 
+                         .move = {},
+                         .std_dev = {}}; 
     move_evaluations.reserve(available_moves.size());
 
     for (size_t i{}; i < available_moves.size(); i++) {
@@ -147,9 +119,106 @@ std::vector<MoveEval> evaluate_all_moves_mc (
         move_evaluations.emplace_back(MoveEval{ 
             .move = Cuarenta::Move{available_moves.at(i)},
             .eval = mean,
-            .std_dev = std::sqrt(var) // clamp to std::max(0.0, std::sqrt(var))?
+            .std_dev = std::sqrt(std::max(0.0, var))
         });
+        if (mean > best_move.eval) { best_move = move_evaluations.back(); }
     }
-    return move_evaluations;
+    return std::pair<MoveEval, std::vector<MoveEval>>{best_move, move_evaluations};
 }
+
+Cuarenta::Move choose_best_move(const Bot& bot, Cuarenta::Game_State game, const int depth) {
+    return get_evaluation_data(bot, game, depth).first.move;
+}
+
+std::vector<MoveEval> evaluate_all_moves(const Bot& bot, Cuarenta::Game_State game, const int depth) {
+    return get_evaluation_data(bot, game, depth).second;
+}
+
+std::pair<MoveEval, bool> determine_if_confident (
+    const Bot& bot,
+    Cuarenta::Game_State& game, 
+    const int depth) {
+
+    const auto available_moves { Cuarenta::generate_all_moves(game) };
+
+    if (available_moves.empty()) {
+        std::cout << "No available moves to evaluate.\n";
+        return {};
+    }
+
+    std::vector<double> S1(available_moves.size());
+    std::vector<double> S2(available_moves.size());
+    std::map<std::pair<size_t, size_t>, double> S1_diff{};
+    std::map<std::pair<size_t, size_t>, double> S2_diff{};
+
+    const auto opp_hand_copy { Cuarenta::opposing_player_state(game).hand.cards };
+
+    int NUM_ITER { bot.num_mc_iters_ };
+
+    for (int unused{}; unused < NUM_ITER; unused++) {
+
+        for (auto& rank : Cuarenta::opposing_player_state(game).hand.cards) {
+            rank = bot.weighted_random_rank();
+        }
+
+        std::vector<double> temp_moves_S1(available_moves.size());
+        std::vector<double> temp_moves_S2(available_moves.size());
+        for (size_t i{}; i < available_moves.size(); i++) {
+
+            const Cuarenta::Undo undo { Cuarenta::make_move_in_place(game, Cuarenta::Move{available_moves.at(i)}) };
+            game.advance_turn();
+            double value { -minimax(game, depth - 1) };
+            game.unadvance_turn();
+            Cuarenta::undo_move_in_place(game, undo);
+
+            S1[i] += value;
+            S2[i] += value;
+            temp_moves_S1[i] = value;
+            temp_moves_S2[i] = value * value;
+        }
+        Cuarenta::opposing_player_state(game).hand.cards = opp_hand_copy;
+
+        for (size_t i{}; i < available_moves.size(); i++) {
+            for (size_t j{}; j < available_moves.size(); j++) {
+                if (i >= j) { continue; }
+                S1_diff[std::pair<size_t, size_t>{i, j}] += (temp_moves_S1[j] - temp_moves_S1[i]);
+                S2_diff[std::pair<size_t, size_t>{i, j}] += ((temp_moves_S2[j] - temp_moves_S1[i]) * (temp_moves_S2[j] - temp_moves_S1[i]));
+            }
+        }
+    }
+
+    std::vector<MoveEval> move_evaluations;
+    bool is_confident {true};
+    MoveEval best_move { .eval = std::numeric_limits<double>::lowest(), 
+                         .move = {},
+                         .std_dev = {}}; 
+    move_evaluations.reserve(available_moves.size());
+
+    for (size_t i{}; i < available_moves.size(); i++) {
+        const double mean { S1[i] / NUM_ITER };
+        const double var  { S2[i] / NUM_ITER - mean * mean };
+        move_evaluations.emplace_back(MoveEval{ 
+            .move = Cuarenta::Move{available_moves.at(i)},
+            .eval = mean,
+            .std_dev = std::sqrt(std::max(0.0, var))
+        });
+        if (mean > best_move.eval) { best_move = move_evaluations.back(); }
+    }
+
+    assert(S1_diff.size() == (available_moves.size() * (available_moves.size() - 1) / 2));
+    for (const auto& [idx, val] : S1_diff) {
+        const double mean {S1_diff[idx] / NUM_ITER};
+        const double var {S2_diff[idx] / NUM_ITER - mean * mean};
+        const double stddev = std::sqrt(std::max(0.0, var));
+
+        // 99.9%
+        const double lower = mean - 3.29053 * stddev;
+        const double upper = mean + 3.29053 * stddev;
+        if(lower <= 0.0 && upper >= 0.0) { is_confident = false; }
+    }
+
+    return std::pair<MoveEval, bool>{best_move, is_confident};
+}
+
+
 }

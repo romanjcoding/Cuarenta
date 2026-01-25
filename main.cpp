@@ -22,15 +22,15 @@ struct Data {
 };
 
 int main() {
-
-    int num_iter { 500 };
+    
+    int num_iter { 20 };
     std::vector<Data> data {};
 
     for (int game_iter{}; game_iter < num_iter; game_iter++) {
         std::cerr << "Starting Game #" << game_iter + 1 << std::endl;
 
-        auto botp1 { Bot::BOT_MAN };
-        auto botp2 { Bot::BOT_MAN };
+        Bot::Bot botp1 {100};
+        Bot::Bot botp2 {100};
         Cuarenta::Game_State game{};
 
         data.push_back( Data{.player = Cuarenta::Player::P1, .is_updated = false} );
@@ -39,7 +39,7 @@ int main() {
         botp1.update_from_hand(Cuarenta::state_for(game, Cuarenta::Player::P1).hand);
         botp2.update_from_hand(Cuarenta::state_for(game, Cuarenta::Player::P2).hand);
 
-        auto finalize_pending_data = [&](const Cuarenta::Game_State& game) {
+        auto finalize_pending_data = [&]() {
         for (auto& d : data) {
             if (!d.is_updated) {
                 d.is_updated = true;
@@ -60,13 +60,13 @@ int main() {
             auto& opposing_bot { (game.to_move == Cuarenta::Player::P1) ? botp2 : botp1 };
 
             if (current.score >= 40 || opponent.score >= 40) { 
-                finalize_pending_data(game);
+                finalize_pending_data();
                 break; 
             } 
 
             if (current.hand.cards.empty() && opponent.hand.cards.empty()) {
 
-                finalize_pending_data(game);
+                finalize_pending_data();
 
                 if (game.deck.cards.empty()) {
                     Cuarenta::update_captured_cards(game);
@@ -97,19 +97,9 @@ int main() {
                          .is_updated = false});
             }
 
-            auto evals = Bot::evaluate_all_moves_mc(current_bot, game, 10);
-            assert(!evals.empty());
-
-            size_t best_idx{};
-            double best_val = evals.front().eval;
-            for (size_t i{}; i < evals.size(); i++) {
-                if (evals[i].eval > best_val) {
-                    best_val = evals[i].eval;
-                    best_idx = i;
-                }
-            }
-            Cuarenta::make_move_in_place(game, evals[best_idx].move);
-            opposing_bot.update_from_move(evals[best_idx].move);
+            auto move { Bot::choose_best_move(current_bot, game, 10) };
+            Cuarenta::make_move_in_place(game, move);
+            opposing_bot.update_from_move(move);
             game.advance_turn();
         }
     }
